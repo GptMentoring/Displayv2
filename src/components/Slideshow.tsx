@@ -21,23 +21,28 @@ const Slideshow: React.FC = () => {
 
   // Handle slide rotation
   useEffect(() => {
-    if (items.length === 0 || settings.layoutMode === 'quadrant' || isSettingsPanelOpen) {
+    if (items.length === 0 || isSettingsPanelOpen) {
       return;
     }
 
-    // Only start interval if there are items, not in quadrant mode, and settings panel is closed
+    // Calculate how many slides we need to show
+    const totalSlides = settings.layoutMode === 'quadrant' 
+      ? Math.ceil(imageItems.length / 3)
+      : items.length;
+
+    if (totalSlides <= 1) return; // Don't rotate if we don't have enough content
+
     const effectiveDuration = (settings.duration || 10) * 1000;
 
     const interval = setInterval(() => {
       setIsTransitioning(true);
       setTimeout(() => {
-        setCurrentIndex((prevIndex) => (prevIndex + 1) % items.length);
+        setCurrentIndex((prevIndex) => (prevIndex + 1) % (settings.layoutMode === 'quadrant' ? imageItems.length : items.length));
         setIsTransitioning(false);
       }, 500); // Shorter than typical transition, matches animation
     }, effectiveDuration);
 
     return () => clearInterval(interval);
-  }, [items.length, settings.duration, settings.layoutMode, isSettingsPanelOpen, settings]); // Added settings to dep array
 
   // Effect for progress bar
   useEffect(() => {
@@ -156,7 +161,13 @@ const Slideshow: React.FC = () => {
   };
 
   const renderQuadrantLayoutContent = () => {
-    const visibleImageItems = imageItems.slice(0, 3);
+    // Use currentIndex to rotate through images in quadrant mode too
+    const rotatedImages = [...imageItems];
+    if (rotatedImages.length > 3) {
+      const offset = Math.floor(currentIndex / 3) * 3;
+      rotatedImages.push(...rotatedImages.splice(0, offset % rotatedImages.length));
+    }
+    const visibleImageItems = rotatedImages.slice(0, 3);
     
     // Determine which iframe to display based on settings
     let quadrantIframe: ContentItem | undefined = undefined;

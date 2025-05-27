@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, Save, Captions as Transition, Eye } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useSlideshowData } from '../lib/useSlideshowData';
 
 interface SettingsHistory {
   id: string;
@@ -10,16 +11,13 @@ interface SettingsHistory {
 }
 
 interface SlideshowSettingsProps {
-  initialDuration: number;
+  initialDuration?: number; // Made optional since we'll use global settings
 }
 
 type LayoutMode = 'regular' | 'quadrant';
 
-const SlideshowSettings: React.FC<SlideshowSettingsProps> = ({ initialDuration }) => {
-  const [duration, setDuration] = useState(initialDuration);
-  const [transition, setTransition] = useState<'fade' | 'slide' | 'zoom'>('fade');
-  const [showControls, setShowControls] = useState(true);
-  const [layoutMode, setLayoutMode] = useState<LayoutMode>('regular');
+const SlideshowSettings: React.FC<SlideshowSettingsProps> = () => {
+  const { settings: globalSettings, setSettings: updateGlobalSettings } = useSlideshowData();
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
   const [settingsHistory, setSettingsHistory] = useState<SettingsHistory[]>([]);
@@ -44,33 +42,17 @@ const SlideshowSettings: React.FC<SlideshowSettingsProps> = ({ initialDuration }
     }
   };
 
-  const handleDurationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(e.target.value);
-    setDuration(value);
-  };
-
-  const handleTransitionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setTransition(e.target.value as 'fade' | 'slide' | 'zoom');
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
     setSaveStatus(null);
 
     try {
-      const settings = {
-        duration,
-        transition,
-        showControls,
-        layoutMode
-      };
-
       const { error } = await supabase
         .from('settings')
         .upsert({ 
-          id: 'slideshow_duration',
-          value: JSON.stringify(settings)
+          id: 'slideshow_settings',
+          value: JSON.stringify(globalSettings)
         });
 
       if (error) {
@@ -109,8 +91,13 @@ const SlideshowSettings: React.FC<SlideshowSettingsProps> = ({ initialDuration }
             type="number"
             min="1"
             max="300"
-            value={duration}
-            onChange={handleDurationChange}
+            value={globalSettings.duration}
+            onChange={(e) => {
+              const value = parseInt(e.target.value, 10);
+              if (!isNaN(value) && value >= 1 && value <= 300) {
+                updateGlobalSettings(prev => ({ ...prev, duration: value }));
+              }
+            }}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             required
           />
@@ -127,8 +114,11 @@ const SlideshowSettings: React.FC<SlideshowSettingsProps> = ({ initialDuration }
             <Transition className="h-4 w-4 text-gray-500" />
             <select
               id="transition"
-              value={transition}
-              onChange={handleTransitionChange}
+              value={globalSettings.transition}
+              onChange={(e) => updateGlobalSettings(prev => ({
+                ...prev,
+                transition: e.target.value as 'fade' | 'slide' | 'zoom'
+              }))}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="fade">Fade</option>
@@ -146,8 +136,11 @@ const SlideshowSettings: React.FC<SlideshowSettingsProps> = ({ initialDuration }
             Layout Mode
           </label>
           <select
-            value={layoutMode}
-            onChange={(e) => setLayoutMode(e.target.value as LayoutMode)}
+            value={globalSettings.layoutMode}
+            onChange={(e) => updateGlobalSettings(prev => ({
+              ...prev,
+              layoutMode: e.target.value as LayoutMode
+            }))}
             className="w-full p-2 border rounded-md"
           >
             <option value="regular">Regular Slideshow</option>
@@ -167,8 +160,11 @@ const SlideshowSettings: React.FC<SlideshowSettingsProps> = ({ initialDuration }
             <label className="flex items-center">
               <input
                 type="checkbox"
-                checked={showControls}
-                onChange={(e) => setShowControls(e.target.checked)}
+                checked={globalSettings.showControls}
+                onChange={(e) => updateGlobalSettings(prev => ({
+                  ...prev,
+                  showControls: e.target.checked
+                }))}
                 className="mr-2"
               />
               <span className="text-sm text-gray-600">Always show controls in presentation</span>
