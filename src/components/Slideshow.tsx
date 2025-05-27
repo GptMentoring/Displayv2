@@ -156,8 +156,7 @@ const Slideshow: React.FC = () => {
   };
 
   const renderQuadrantLayoutContent = () => {
-    // Get first 3 images, if not enough images, use what we have
-    const visibleImageItems = imageItems.length > 0 ? imageItems.slice(0, 3) : [];
+    const visibleImageItems = imageItems.slice(0, 3);
     
     // Determine which iframe to display based on settings
     let quadrantIframe: ContentItem | undefined = undefined;
@@ -171,22 +170,26 @@ const Slideshow: React.FC = () => {
 
     return (
       <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-1 bg-black p-1">
-        {/* Render image quadrants */}
-        {[0, 1, 2].map((index) => (
+        {visibleImageItems.map((image, index) => (
           <div
-            key={`quad-${index}`}
+            key={image.id}
             className="relative flex items-center justify-center bg-black"
           >
-            {visibleImageItems[index] ? (
-              <img
-                src={visibleImageItems[index].url}
-                alt={`Content ${index + 1}`}
-                className={`max-h-full max-w-full object-contain ${getTransitionClass()}`}
-                style={{ opacity: isTransitioning ? 0 : 1, transition: transitionStyle }}
-              />
-            ) : (
-              <div className="text-gray-500 text-sm">No image available</div>
-            )}
+            <img
+              src={image.url}
+              alt={`Content ${index + 1}`}
+              className={`max-h-full max-w-full object-contain ${getTransitionClass()}`}
+              style={{ opacity: isTransitioning ? 0 : 1, transition: transitionStyle }}
+            />
+          </div>
+        ))}
+        {/* Fill remaining image slots if less than 3 images */}
+        {Array.from({ length: Math.max(0, 3 - visibleImageItems.length) }).map((_, i) => (
+          <div
+            key={`empty-${i}`}
+            className="relative flex items-center justify-center bg-black"
+          >
+            <div className="text-gray-500 text-sm">No image available</div>
           </div>
         ))}
         {/* IFrame quadrant */}
