@@ -43,7 +43,7 @@ const Slideshow: React.FC = () => {
     }, effectiveDuration);
 
     return () => clearInterval(interval);
-  }, [items.length, settings.duration, settings.layoutMode, isSettingsPanelOpen, imageItems.length]);
+  }, [items.length, settings.layoutMode, settings.duration, isSettingsPanelOpen, imageItems.length]);
 
   // Effect for progress bar
   useEffect(() => {
