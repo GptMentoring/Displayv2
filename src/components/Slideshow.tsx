@@ -260,20 +260,20 @@ const Slideshow: React.FC = () => {
         }`}
       >
         <div className="flex justify-between items-center max-w-7xl mx-auto">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setIsSettingsPanelOpen(prev => !prev)}
-              className="text-white bg-gray-800/50 hover:bg-gray-700/50 p-2 rounded-full transition-colors"
-              aria-label={isSettingsPanelOpen ? 'Close settings' : 'Open settings'}
-            >
-              <SettingsIcon className="w-6 h-6" />
-            </button>
-            {items.length > 0 && settings.layoutMode !== 'quadrant' && (
+          {settings.layoutMode === 'regular' && (
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setIsSettingsPanelOpen(prev => !prev)}
+                className="text-white bg-gray-800/50 hover:bg-gray-700/50 p-2 rounded-full transition-colors"
+                aria-label={isSettingsPanelOpen ? 'Close settings' : 'Open settings'}
+              >
+                <SettingsIcon className="w-6 h-6" />
+              </button>
               <div className="text-white/70 text-sm tabular-nums">
                 {currentIndex + 1} / {items.length}
               </div>
-            )}
-          </div>
+            </div>
+          )}
           <button
             onClick={handleExit}
             className="text-white bg-gray-800/50 hover:bg-gray-700/50 p-2 rounded-full transition-colors"
@@ -285,7 +285,7 @@ const Slideshow: React.FC = () => {
       </div>
 
       {/* Settings Panel */}
-      {isSettingsPanelOpen && (
+      {settings.layoutMode === 'regular' && isSettingsPanelOpen && (
         <div className="fixed top-16 left-4 bg-white rounded-lg shadow-xl p-6 w-96 z-50">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-xl font-semibold text-gray-800">Presentation Settings</h3>
