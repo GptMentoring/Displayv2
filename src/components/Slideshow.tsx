@@ -17,11 +17,12 @@ const Slideshow: React.FC = () => {
   const [isSettingsPanelOpen, setIsSettingsPanelOpen] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [quadrantImageIndex, setQuadrantImageIndex] = useState(0);
   const [progress, setProgress] = useState(0); // Progress bar state (0 to 100)
 
   // Handle slide rotation
   useEffect(() => {
-    if (items.length === 0 || settings.layoutMode === 'quadrant' || isSettingsPanelOpen) {
+    if (items.length === 0 || isSettingsPanelOpen) {
       return;
     }
 
@@ -31,13 +32,17 @@ const Slideshow: React.FC = () => {
     const interval = setInterval(() => {
       setIsTransitioning(true);
       setTimeout(() => {
-        setCurrentIndex((prevIndex) => (prevIndex + 1) % items.length);
+        if (settings.layoutMode === 'regular') {
+          setCurrentIndex((prevIndex) => (prevIndex + 1) % items.length);
+        } else {
+          setQuadrantImageIndex((prevIndex) => (prevIndex + 1) % imageItems.length);
+        }
         setIsTransitioning(false);
       }, 500); // Shorter than typical transition, matches animation
     }, effectiveDuration);
 
     return () => clearInterval(interval);
-  }, [items.length, settings.duration, settings.layoutMode, isSettingsPanelOpen, settings]); // Added settings to dep array
+  }, [items.length, settings.duration, settings.layoutMode, isSettingsPanelOpen, settings, imageItems.length]);
 
   // Effect for progress bar
   useEffect(() => {
@@ -156,7 +161,11 @@ const Slideshow: React.FC = () => {
   };
 
   const renderQuadrantLayoutContent = () => {
-    const visibleImageItems = imageItems.slice(0, 2);
+    // Get two consecutive images starting from quadrantImageIndex
+    const visibleImageItems = [
+      imageItems[quadrantImageIndex % imageItems.length],
+      imageItems[(quadrantImageIndex + 1) % imageItems.length]
+    ].filter(Boolean); // Filter out undefined items if we don't have enough images
     
     // Get selected iframes if enabled, otherwise null
     const bottomLeftIframe = settings.quadrantIframeIds.bottomLeftEnabled && settings.quadrantIframeIds.bottomLeft
@@ -182,7 +191,7 @@ const Slideshow: React.FC = () => {
             />
           </div>
         ))}
-        {/* Fill remaining image slots if less than 3 images */}
+        {/* Fill remaining image slots if less than 2 images */}
         {Array.from({ length: Math.max(0, 2 - visibleImageItems.length) }).map((_, i) => (
           <div
             key={`empty-${i}`}
@@ -194,7 +203,8 @@ const Slideshow: React.FC = () => {
         {/* IFrame quadrant */}
         {/* Bottom Left IFrame */}
         <div className="bg-gray-800 relative">
-          {bottomLeftIframe ? (
+          {settings.quadrantIframeIds.bottomLeftEnabled ? (
+            bottomLeftIframe ? (
             <iframe
               key={bottomLeftIframe.id}
               src={bottomLeftIframe.url}
@@ -209,12 +219,27 @@ const Slideshow: React.FC = () => {
             <div className="w-full h-full flex items-center justify-center text-white">
               No IFrame selected
             </div>
+            )
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              {imageItems[(quadrantImageIndex + 2) % imageItems.length] ? (
+                <img
+                  src={imageItems[(quadrantImageIndex + 2) % imageItems.length].url}
+                  alt="Additional content"
+                  className={`max-h-full max-w-full object-contain ${getTransitionClass()}`}
+                  style={{ opacity: isTransitioning ? 0 : 1, transition: transitionStyle }}
+                />
+              ) : (
+                <div className="text-gray-500">No additional image available</div>
+              )}
+            </div>
           )}
         </div>
         
         {/* Bottom Right IFrame */}
         <div className="bg-gray-800 relative">
-          {bottomRightIframe ? (
+          {settings.quadrantIframeIds.bottomRightEnabled ? (
+            bottomRightIframe ? (
             <iframe
               key={bottomRightIframe.id}
               src={bottomRightIframe.url}
@@ -228,6 +253,20 @@ const Slideshow: React.FC = () => {
             />) : (
             <div className="w-full h-full flex items-center justify-center text-white">
               No IFrame selected
+            </div>
+            )
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              {imageItems[(quadrantImageIndex + 3) % imageItems.length] ? (
+                <img
+                  src={imageItems[(quadrantImageIndex + 3) % imageItems.length].url}
+                  alt="Additional content"
+                  className={`max-h-full max-w-full object-contain ${getTransitionClass()}`}
+                  style={{ opacity: isTransitioning ? 0 : 1, transition: transitionStyle }}
+                />
+              ) : (
+                <div className="text-gray-500">No additional image available</div>
+              )}
             </div>
           )}
         </div>
