@@ -92,6 +92,29 @@ const AdminPage: React.FC = () => {
     }
   };
 
+  const handleReorderContent = async (reorderedItems: ContentItem[]) => {
+    try {
+      const updates = reorderedItems.map((item, index) => ({
+        id: item.id,
+        sort_order: index,
+      }));
+
+      const { error } = await supabase.from('content_items').upsert(updates);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      // Update local state optimistically
+      setContentItems(reorderedItems);
+    } catch (error) {
+      console.error('Error reordering content:', error);
+      alert('Failed to reorder content. Please try again.');
+      // Revert to previous state by refetching
+      fetchContentItems();
+    }
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
   };
@@ -121,9 +144,9 @@ const AdminPage: React.FC = () => {
               ) : (
                 <ContentList
                   items={contentItems}
-                  setItems={setContentItems} // Pass state setter for optimistic updates
+                  setItems={setContentItems}
                   onContentDeleted={fetchContentItems}
-                  onReorder={handleReorderContent} // New prop for handling DB updates
+                  onReorder={handleReorderContent}
                 />
               )}
             </div>
