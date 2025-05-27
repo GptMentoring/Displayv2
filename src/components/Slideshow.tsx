@@ -156,7 +156,8 @@ const Slideshow: React.FC = () => {
   };
 
   const renderQuadrantLayoutContent = () => {
-    const visibleImageItems = imageItems.slice(0, 3);
+    // Get first 3 images, if not enough images, use what we have
+    const visibleImageItems = imageItems.length > 0 ? imageItems.slice(0, 3) : [];
     
     // Determine which iframe to display based on settings
     let quadrantIframe: ContentItem | undefined = undefined;
@@ -170,23 +171,25 @@ const Slideshow: React.FC = () => {
 
     return (
       <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-1 bg-black p-1">
-        {visibleImageItems.map((image, index) => (
+        {/* Render image quadrants */}
+        {[0, 1, 2].map((index) => (
           <div
-            key={image.id || `quad-img-${index}`}
-            className={`relative flex items-center justify-center bg-black ${index === 2 ? 'col-span-1' : ''}`} // Example: last image spans if only 3
+            key={`quad-${index}`}
+            className="relative flex items-center justify-center bg-black"
           >
-            <img
-              src={image.url}
-              alt={`Content ${index + 1}`}
-              className={`max-h-full max-w-full object-contain ${getTransitionClass()}`}
-              style={{ opacity: isTransitioning ? 0 : 1, transition: transitionStyle }}
-            />
+            {visibleImageItems[index] ? (
+              <img
+                src={visibleImageItems[index].url}
+                alt={`Content ${index + 1}`}
+                className={`max-h-full max-w-full object-contain ${getTransitionClass()}`}
+                style={{ opacity: isTransitioning ? 0 : 1, transition: transitionStyle }}
+              />
+            ) : (
+              <div className="text-gray-500 text-sm">No image available</div>
+            )}
           </div>
         ))}
-        {/* Fill remaining grid cells if less than 3 images */}
-        {Array.from({ length: Math.max(0, 3 - visibleImageItems.length) }).map((_, i) => (
-            <div key={`empty-quad-${i}`} className="bg-black" /> // Ensure these keys are unique
-        ))}
+        {/* IFrame quadrant */}
         <div className="bg-gray-800">
           {quadrantIframe && (
             <iframe
