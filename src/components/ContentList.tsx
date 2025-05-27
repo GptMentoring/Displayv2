@@ -1,224 +1,462 @@
-import React, { useState } from 'react';
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-} from '@dnd-kit/core';
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-  useSortable,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Trash2, Image, Globe } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { X, Settings as SettingsIcon } from 'lucide-react'; // Renamed Settings to avoid conflict
+import { useSlideshowData } from '../lib/useSlideshowData';
 import { Database } from '../lib/database.types';
 
 type ContentItem = Database['public']['Tables']['content_items']['Row'];
-
-interface ContentListProps {
-  items: ContentItem[];
-  setItems: React.Dispatch<React.SetStateAction<ContentItem[]>>; // For optimistic update
-  onContentDeleted: () => void;
-  onReorder: (reorderedItems: ContentItem[]) => Promise<void>; // To handle saving to DB
-}
-
-// Individual Sortable Item Component
-const SortableItem: React.FC<{ item: ContentItem; isDeleting: boolean; handleDelete: (item: ContentItem) => void }> = ({
-  item,
-  isDeleting,
-  handleDelete,
-}) => {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: item.id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    zIndex: isDragging ? 10 : undefined, // Ensure dragging item is on top
-    opacity: isDragging ? 0.8 : 1,
-  };
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm ${
-        isDragging ? 'shadow-xl' : 'hover:shadow-md'
-      } transition-shadow flex items-stretch`} // Use flex for layout
-    >
-      {/* Drag Handle */}
-      <div
-        {...attributes}
-        {...listeners}
-        className="p-3 bg-gray-50 hover:bg-gray-100 cursor-grab touch-none flex items-center justify-center"
-        aria-label="Drag to reorder"
-      >
-        <GripVertical className="h-5 w-5 text-gray-500" />
-      </div>
-
-      {/* Item Content */}
-      <div className="flex-grow"> {/* Make this part take remaining space */}
-        <div className="aspect-video bg-gray-100 relative">
-          {item.type === 'image' ? (
-            <img
-              src={item.url}
-              alt="Content preview"
-              className="w-full h-full object-contain"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center bg-gray-100">
-              <Globe className="h-12 w-12 text-gray-400" />
-              <span className="sr-only">iframe content</span>
-            </div>
-          )}
-        </div>
-        <div className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              {item.type === 'image' ? (
-                <Image className="h-4 w-4 text-blue-500" />
-              ) : (
-                <Globe className="h-4 w-4 text-green-500" />
-              )}
-              <span className="font-medium text-gray-700 capitalize">
-                {item.type}
-              </span>
-            </div>
-            <button
-              onClick={() => handleDelete(item)}
-              disabled={isDeleting}
-              className={`text-red-500 hover:bg-red-50 p-2 rounded-full ${
-                isDeleting ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
-              title="Delete item"
-            >
-              <Trash2 className="h-4 w-4" />
-              <span className="sr-only">Delete</span>
-            </button>
-          </div>
-          <div className="mt-2 truncate text-sm text-gray-500">
-            {item.type === 'iframe' ? (
-              <a
-                href={item.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:underline text-blue-600"
-              >
-                {item.url}
-              </a>
-            ) : (
-              <span>{item.name || new URL(item.url).pathname.split('/').pop()}</span>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
+// Settings type is now primarily managed by useSlideshowData, but we might need it for props or local component state
+type SlideshowSettings = ReturnType<typeof useSlideshowData>['settings'];
 
 
-const ContentList: React.FC<ContentListProps> = ({ items, setItems, onContentDeleted, onReorder }) => {
-  const [isDeleting, setIsDeleting] = useState<Record<string, boolean>>({});
-  const [isSavingOrder, setIsSavingOrder] = useState(false);
+const Slideshow: React.FC = () => {
+  const navigate = useNavigate();
+  const { items, settings, isLoading, error, setSettings: updateGlobalSettings } = useSlideshowData();
 
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
+  const [showControlsBar, setShowControlsBar] = useState(true); // For mouse hover controls
+  const [isSettingsPanelOpen, setIsSettingsPanelOpen] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [progress, setProgress] = useState(0); // Progress bar state (0 to 100)
 
-  const handleDelete = async (item: ContentItem) => {
-    if (isDeleting[item.id] || isSavingOrder) return;
-
-    setIsDeleting(prev => ({ ...prev, [item.id]: true }));
-    try {
-      if (item.type === 'image' && item.storage_path) {
-        const { error: storageError } = await supabase.storage
-          .from('content')
-          .remove([item.storage_path]);
-        if (storageError) console.error('Error deleting from storage:', storageError);
-      }
-      const { error } = await supabase.from('content_items').delete().eq('id', item.id);
-      if (error) throw new Error(error.message);
-      onContentDeleted(); // This will refetch and update items in AdminPage
-    } catch (error) {
-      console.error('Error deleting item:', error);
-      alert('Failed to delete item. Please try again.');
-    } finally {
-      setIsDeleting(prev => ({ ...prev, [item.id]: false }));
+  // Handle slide rotation
+  useEffect(() => {
+    if (items.length === 0 || settings.layoutMode === 'quadrant' || isSettingsPanelOpen) {
+      return;
     }
-  };
 
-  const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (over && active.id !== over.id) {
-      const oldIndex = items.findIndex((item) => item.id === active.id);
-      const newIndex = items.findIndex((item) => item.id === over.id);
-      const reorderedItems = arrayMove(items, oldIndex, newIndex);
-      
-      setItems(reorderedItems); // Optimistic update
-      setIsSavingOrder(true);
-      try {
-        await onReorder(reorderedItems);
-        // Optionally show success feedback here
-      } catch (error) {
-        // Revert optimistic update on error
-        setItems(items); 
-        alert('Failed to save new order. Please try again.');
-        console.error('Error saving order:', error);
-      } finally {
-        setIsSavingOrder(false);
+    // Only start interval if there are items, not in quadrant mode, and settings panel is closed
+    const effectiveDuration = (settings.duration || 10) * 1000;
+
+    const interval = setInterval(() => {
+      setIsTransitioning(true);
+      setTimeout(() => {
+        setCurrentIndex((prevIndex) => (prevIndex + 1) % items.length);
+        setIsTransitioning(false);
+      }, 500); // Shorter than typical transition, matches animation
+    }, effectiveDuration);
+
+    return () => clearInterval(interval);
+  }, [items.length, settings.duration, settings.layoutMode, isSettingsPanelOpen, settings]); // Added settings to dep array
+
+  // Effect for progress bar
+  useEffect(() => {
+    if (settings.layoutMode !== 'regular' || isSettingsPanelOpen || items.length === 0 || isTransitioning) {
+      if (isTransitioning) { // Reset progress to 0 when transition starts
+        setProgress(0);
       }
+      return;
     }
-  };
 
-  if (items.length === 0) {
+    setProgress(0); // Reset progress for new slide
+    const startTime = Date.now();
+    const slideDurationMs = (settings.duration || 10) * 1000;
+    let animationFrameId: number;
+
+    const updateProgress = () => {
+      const elapsedTime = Date.now() - startTime;
+      const currentProgress = Math.min(100, (elapsedTime / slideDurationMs) * 100);
+      setProgress(currentProgress);
+
+      if (elapsedTime < slideDurationMs) {
+        animationFrameId = requestAnimationFrame(updateProgress);
+      }
+    };
+
+    animationFrameId = requestAnimationFrame(updateProgress);
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, [currentIndex, settings.duration, settings.layoutMode, isSettingsPanelOpen, items.length, isTransitioning, settings]); // Added settings and isTransitioning
+
+  const handleExit = useCallback(() => {
+    navigate('/admin');
+  }, [navigate]);
+
+  const getTransitionClass = useCallback(() => {
+    switch (settings.transition) {
+      case 'slide':
+        return 'animate-slide-in';
+      case 'zoom':
+        return 'animate-zoom-in';
+      default: // fade
+        return 'animate-fade-in';
+    }
+  }, [settings.transition]);
+
+
+  // Memoize filtered items to prevent re-calculation on every render
+  const imageItems = useMemo(() => items.filter(item => item.type === 'image'), [items]);
+  const iframeItems = useMemo(() => items.filter(item => item.type === 'iframe'), [items]);
+
+
+  // Controls visibility logic: show if settings panel is open OR if mouse is over the slideshow
+  const actualShowControls = isSettingsPanelOpen || showControlsBar;
+
+  // Moved renderContent outside to be memoizable if needed, or to become a separate component
+  // For now, it's simple enough to be inline or defined within the component body.
+  // If it were more complex, React.memo and useCallback for props would be considered.
+
+  if (isLoading) {
     return (
-      <div className="text-center py-8 bg-gray-50 rounded-lg">
-        <p className="text-gray-500">No content items yet. Add some above!</p>
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-white text-xl">Loading slideshow...</div>
       </div>
     );
   }
 
-  return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragEnd={handleDragEnd}
-    >
-      <SortableContext items={items.map(item => item.id)} strategy={verticalListSortingStrategy}>
-        {isSavingOrder && (
-          <div className="fixed top-4 right-4 bg-blue-500 text-white p-3 rounded-md shadow-lg z-50">
-            Saving new order...
-          </div>
-        )}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {items.map(item => (
-            <SortableItem 
-              key={item.id} 
-              item={item} 
-              isDeleting={isDeleting[item.id] || false} 
-              handleDelete={handleDelete} 
+  if (error) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-white text-xl p-4 text-center">{error}</div>
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-white text-xl">No content available for slideshow. <button onClick={handleExit} className="underline">Go to Admin</button></div>
+      </div>
+    );
+  }
+
+  const currentItem = items[currentIndex];
+  const transitionStyle = 'opacity 0.5s ease-in-out';
+
+  const renderRegularLayoutContent = () => {
+    if (!currentItem) return null;
+    const isActive = true; // In regular mode, the currentItem is always the one to display
+    const opacity = isTransitioning && isActive ? 0 : 1;
+
+    if (currentItem.type === 'image') {
+      return (
+        <img
+          key={currentItem.id}
+          src={currentItem.url}
+          alt={`Slide ${currentIndex + 1}`}
+          className={`max-h-screen max-w-full object-contain ${getTransitionClass()}`}
+          style={{ opacity, transition: transitionStyle }}
+        />
+      );
+    }
+    return (
+      <iframe
+        key={currentItem.id}
+        src={currentItem.url}
+        title="Embedded content"
+        className="w-full h-screen border-0"
+        sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-presentation"
+        referrerPolicy="origin"
+        allowFullScreen
+        style={{ opacity, transition: transitionStyle }}
+      />
+    );
+  };
+
+  const renderQuadrantLayoutContent = () => {
+    const visibleImageItems = imageItems.slice(0, 2); // Only need 2 images for top quadrants
+
+    // Get selected iframes if enabled, otherwise null
+    const bottomLeftIframe = settings.quadrantIframeIds.bottomLeftEnabled && settings.quadrantIframeIds.bottomLeft
+      ? iframeItems.find(item => item.id === settings.quadrantIframeIds.bottomLeft)
+      : null;
+
+    const bottomRightIframe = settings.quadrantIframeIds.bottomRightEnabled && settings.quadrantIframeIds.bottomRight
+      ? iframeItems.find(item => item.id === settings.quadrantIframeIds.bottomRight)
+      : iframeItems[0];
+
+    return (
+      <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-1 bg-black p-1">
+        {/* Top two quadrants always show images */}
+        {visibleImageItems.slice(0, 2).map((image, index) => (
+          <div
+            key={image.id}
+            className="relative flex items-center justify-center bg-black"
+          >
+            <img
+              src={image.url}
+              alt={`Content ${index + 1}`}
+              className={`max-h-full max-w-full object-contain ${getTransitionClass()}`}
+              style={{ opacity: isTransitioning ? 0 : 1, transition: transitionStyle }}
             />
-          ))}
+          </div>
+        ))}
+        {/* Fill remaining top image slots if needed */}
+        {Array.from({ length: Math.max(0, 2 - visibleImageItems.length) }).map((_, i) => (
+          <div
+            key={`empty-${i}`}
+            className="relative flex items-center justify-center bg-black"
+          >
+            <div className="text-gray-500 text-sm">No image available</div>
+          </div>
+        ))}
+
+        {/* Bottom Left IFrame */}
+        <div className="bg-gray-800 relative">
+          {bottomLeftIframe ? (
+            <iframe
+              key={bottomLeftIframe.id}
+              src={bottomLeftIframe.url}
+              title={`Bottom Left - ${bottomLeftIframe.name || 'Untitled'}`}
+              className="w-full h-full border-0"
+              sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-presentation"
+              referrerPolicy="origin"
+              allow="fullscreen"
+              allowFullScreen
+              style={{ opacity: isTransitioning ? 0 : 1, transition: transitionStyle }}
+            />) : (
+            // Show next available image if iframe is disabled or not selected
+            allVisibleImages[2] ? (
+              <img
+                src={allVisibleImages[2].url}
+                alt={`Content 3`}
+                className={`w-full h-full object-contain ${getTransitionClass()}`}
+                style={{ opacity: isTransitioning ? 0 : 1, transition: transitionStyle }}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-gray-500 text-sm">
+                No image available
+              </div>
+            )
+          )}
         </div>
-      </SortableContext>
-    </DndContext>
+        
+        {/* Bottom Right IFrame */}
+        <div className="bg-gray-800 relative">
+          {bottomRightIframe ? (
+            <iframe
+              key={bottomRightIframe.id}
+              src={bottomRightIframe.url}
+              title={`Bottom Right - ${bottomRightIframe.name || 'Untitled'}`}
+              className="w-full h-full border-0"
+              sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-presentation"
+              referrerPolicy="origin"
+              allow="fullscreen"
+              allowFullScreen
+              style={{ opacity: isTransitioning ? 0 : 1, transition: transitionStyle }}
+            />) : (
+            // Show next available image if iframe is disabled or not selected
+            allVisibleImages[3] ? (
+              <img
+                src={allVisibleImages[3].url}
+                alt={`Content 4`}
+                className={`w-full h-full object-contain ${getTransitionClass()}`}
+                style={{ opacity: isTransitioning ? 0 : 1, transition: transitionStyle }}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-gray-500 text-sm">No image available</div>
+            )
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div
+      className="fixed inset-0 bg-black flex items-center justify-center"
+      onMouseMove={() => setShowControlsBar(true)}
+      onMouseLeave={() => { if (!isSettingsPanelOpen) setShowControlsBar(false);}}
+    >
+      {settings.layoutMode === 'quadrant' ? renderQuadrantLayoutContent() : renderRegularLayoutContent()}
+
+      {/* Progress Bar - Only in Regular Mode */}
+      {settings.layoutMode === 'regular' && items.length > 0 && !isSettingsPanelOpen && (
+        <div className="fixed bottom-0 left-0 w-full h-1.5 bg-gray-700/50 z-50">
+          <div
+            className="h-full bg-blue-500"
+            style={{ width: `${progress}%`, transition: progress === 0 ? 'none' : 'width 0.1s linear' }}
+          />
+        </div>
+      )}
+
+      {/* Controls Overlay */}
+      <div
+        className={`fixed top-0 left-0 right-0 p-4 transition-opacity duration-300 ${
+          actualShowControls ? 'opacity-100' : 'opacity-0'
+        }`}
+      >
+        <div className="flex justify-between items-center max-w-7xl mx-auto">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setIsSettingsPanelOpen(prev => !prev)}
+              className="text-white bg-gray-800/50 hover:bg-gray-700/50 p-2 rounded-full transition-colors"
+              aria-label={isSettingsPanelOpen ? 'Close settings' : 'Open settings'}
+            >
+              <SettingsIcon className="w-6 h-6" />
+            </button>
+            {items.length > 0 && settings.layoutMode !== 'quadrant' && (
+              <div className="text-white/70 text-sm tabular-nums">
+                {currentIndex + 1} / {items.length}
+              </div>
+            )}
+          </div>
+          <button
+            onClick={handleExit}
+            className="text-white bg-gray-800/50 hover:bg-gray-700/50 p-2 rounded-full transition-colors"
+            aria-label="Exit slideshow"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+      </div>
+
+      {/* Settings Panel */}
+      {isSettingsPanelOpen && (
+        <div className="fixed top-16 left-4 bg-white rounded-lg shadow-xl p-6 w-96 z-50">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-xl font-semibold text-gray-800">Presentation Settings</h3>
+            <button 
+              onClick={() => setIsSettingsPanelOpen(false)} 
+              className="text-gray-500 hover:text-gray-700"
+              aria-label="Close settings panel"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          
+          <div className="space-y-6">
+            <div>
+              <label htmlFor="transitionEffect" className="block text-sm font-medium text-gray-700 mb-1">
+                Transition Effect
+              </label>
+              <select
+                id="transitionEffect"
+                value={settings.transition}
+                onChange={(e) => updateGlobalSettings(prev => ({
+                  ...prev,
+                  transition: e.target.value as SlideshowSettings['transition']
+                }))}
+                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                <option value="fade">Fade</option>
+                <option value="slide">Slide</option>
+                <option value="zoom">Zoom</option>
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="slideDuration" className="block text-sm font-medium text-gray-700 mb-1">
+                Slide Duration (seconds)
+              </label>
+              <input
+                type="number"
+                id="slideDuration"
+                min="1"
+                max="60"
+                value={settings.duration}
+                onChange={(e) => {
+                  const newDuration = parseInt(e.target.value, 10);
+                  if (!isNaN(newDuration) && newDuration >= 1 && newDuration <= 60) {
+                    updateGlobalSettings(prev => ({ ...prev, duration: newDuration }));
+                  }
+                }}
+                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+            
+            <div>
+              <label htmlFor="layoutMode" className="block text-sm font-medium text-gray-700 mb-1">
+                Layout Mode
+              </label>
+              <select
+                id="layoutMode"
+                value={settings.layoutMode}
+                onChange={(e) => updateGlobalSettings(prev => ({
+                  ...prev,
+                  layoutMode: e.target.value as SlideshowSettings['layoutMode']
+                }))}
+                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                <option value="regular">Regular (Single View)</option>
+                <option value="quadrant">Quadrant</option>
+              </select>
+            </div>
+
+            {settings.layoutMode === 'quadrant' && (
+              <div className="space-y-4 mt-2 p-3 bg-gray-50 rounded-md border border-gray-200">
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-600 mb-2">Quadrant Layout Configuration:</h4>
+                  <ul className="list-disc list-inside text-xs text-gray-600 space-y-1">
+                    <li>Top-Left: Displays the 1st available image (by sort order).</li>
+                    <li>Top-Right: Displays the 2nd available image</li>
+                    <li>
+                      Bottom Half: Select iframes to display in bottom quadrants or show additional images.
+                      When iframes are disabled, the next available images will be shown instead.
+                    </li>
+                  </ul>
+                  {imageItems.length < 2 && (
+                    <p className="mt-2 text-xs text-amber-700">
+                      Note: Fewer than 2 images are available. Some image quadrants may be empty.
+                    </p>
+                  )}
+                </div>
+                
+                {/* Bottom Left IFrame Selection */}
+                <div>
+                  <label htmlFor="bottomLeftIframe" className="block text-sm font-medium text-gray-700 mb-1">
+                    Bottom Left IFrame
+                  </label>
+                  <select
+                    id="bottomLeftIframe"
+                    value={settings.quadrantIframeIds.bottomLeft || ''}
+                    onChange={(e) => updateGlobalSettings(prev => ({
+                      ...prev,
+                      quadrantIframeIds: {
+                        ...prev.quadrantIframeIds,
+                        bottomLeft: e.target.value || null
+                      }
+                    }))}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                    disabled={iframeItems.length === 0}
+                  >
+                    <option value="">Select Bottom Left IFrame</option>
+                    {iframeItems.map(iframe => (
+                      <option key={iframe.id} value={iframe.id}>
+                        {iframe.name || iframe.url} ({iframe.id.substring(0,6)})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                {/* Bottom Right IFrame Selection */}
+                <div className="mt-4">
+                  <label htmlFor="bottomRightIframe" className="block text-sm font-medium text-gray-700 mb-1">
+                    Bottom Right IFrame
+                  </label>
+                  <select
+                    id="bottomRightIframe"
+                    value={settings.quadrantIframeIds.bottomRight || ''}
+                    onChange={(e) => updateGlobalSettings(prev => ({
+                      ...prev,
+                      quadrantIframeIds: {
+                        ...prev.quadrantIframeIds,
+                        bottomRight: e.target.value || null
+                      }
+                    }))}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                    disabled={iframeItems.length === 0}
+                  >
+                    <option value="">Select Bottom Right IFrame</option>
+                    {iframeItems.map(iframe => (
+                      <option key={iframe.id} value={iframe.id}>
+                        {iframe.name || iframe.url} ({iframe.id.substring(0,6)})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+            {/* Future settings can be added here */}
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 
-export default ContentList;
+export default Slideshow;
+
+export default Slideshow
