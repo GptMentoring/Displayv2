@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from './supabase';
-import { Database } from '../lib/database.types';
+import { Database } from './database.types';
 
 type ContentItem = Database['public']['Tables']['content_items']['Row'];
 type Settings = {
@@ -9,10 +9,8 @@ type Settings = {
   showControls: boolean;
   layoutMode: 'regular' | 'quadrant';
   quadrantIframeIds: {
-    bottomLeft: string | null;
-    bottomRight: string | null;
-    bottomLeftEnabled: boolean;
-    bottomRightEnabled: boolean;
+    bottomLeft?: string | null;
+    bottomRight?: string | null;
   };
 };
 
@@ -24,9 +22,7 @@ const defaultSettings: Settings = {
   quadrantIframeIds: {
     bottomLeft: null,
     bottomRight: null,
-    bottomLeftEnabled: true,
-    bottomRightEnabled: true
-  }
+  },
 };
 
 export const useSlideshowData = () => {
@@ -57,19 +53,21 @@ export const useSlideshowData = () => {
         const { data: settingsData, error: settingsError } = await supabase
           .from('settings')
           .select('value')
-          .eq('id', 'slideshow_settings')
+          .eq('id', 'slideshow_settings') // Assuming 'slideshow_settings' stores the whole object
           .single();
 
-        if (settingsError && settingsError.code !== 'PGRST116') {
+        if (settingsError && settingsError.code !== 'PGRST116') { // PGRST116: No rows found
           console.error('Error fetching settings:', settingsError);
+          // Keep default settings if none are found or there's an error (excluding "No rows found")
         }
 
-        if (settingsData?.value) {
+        if (settingsData && settingsData.value) {
           try {
-            const parsedSettings = JSON.parse(settingsData.value);
+            const parsedSettings = JSON.parse(settingsData.value as string);
             setSettings(prevSettings => ({ ...prevSettings, ...parsedSettings }));
           } catch (parseError) {
             console.error('Error parsing settings:', parseError);
+            // Keep default/previous settings if parsing fails
           }
         }
       } catch (err: any) {
@@ -87,8 +85,9 @@ export const useSlideshowData = () => {
       .on<ContentItem>(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'content_items' },
-        () => {
-          fetchData();
+        (payload) => {
+          // console.log('Content change received:', payload);
+          fetchData(); // Refetch all data on any change
         }
       )
       .subscribe();
@@ -104,6 +103,7 @@ export const useSlideshowData = () => {
           filter: 'id=eq.slideshow_settings',
         },
         (payload) => {
+          // console.log('Settings change received:', payload);
           if (payload.new && typeof payload.new.value === 'string') {
             try {
               const newSettings = JSON.parse(payload.new.value);
@@ -111,6 +111,9 @@ export const useSlideshowData = () => {
             } catch (parseError) {
               console.error('Error parsing settings update:', parseError);
             }
+          } else if (payload.new && typeof payload.new.value === 'object') {
+             // If value is already an object (e.g. from a direct JS update)
+            setSettings(prevSettings => ({ ...prevSettings, ...(payload.new.value as Partial<Settings>) }));
           }
         }
       )
