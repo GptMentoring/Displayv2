@@ -119,9 +119,11 @@ const AdminPage: React.FC = () => {
               {isLoading ? (
                 <div className="text-center py-8">Loading content...</div>
               ) : (
-                <ContentList 
-                  items={contentItems} 
-                  onContentDeleted={fetchContentItems} 
+                <ContentList
+                  items={contentItems}
+                  setItems={setContentItems} // Pass state setter for optimistic updates
+                  onContentDeleted={fetchContentItems}
+                  onReorder={handleReorderContent} // New prop for handling DB updates
                 />
               )}
             </div>
