@@ -13,6 +13,13 @@ const Slideshow: React.FC = () => {
   const navigate = useNavigate();
   const { items, settings, isLoading, error, setSettings: updateGlobalSettings } = useSlideshowData();
 
+  // Ensure we have a valid currentIndex
+  useEffect(() => {
+    if (items.length > 0 && currentIndex >= items.length) {
+      setCurrentIndex(0);
+    }
+  }, [items.length, currentIndex]);
+
   const [showControlsBar, setShowControlsBar] = useState(true); // For mouse hover controls
   const [isSettingsPanelOpen, setIsSettingsPanelOpen] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -134,17 +141,19 @@ const Slideshow: React.FC = () => {
   const renderRegularLayoutContent = () => {
     if (!currentItem) return null;
     const isActive = true; // In regular mode, the currentItem is always the one to display
-    const opacity = isTransitioning && isActive ? 0 : 1;
+    const opacity = isTransitioning ? 0 : 1;
 
     if (currentItem.type === 'image') {
       return (
-        <img
-          key={currentItem.id}
-          src={currentItem.url}
-          alt={`Slide ${currentIndex + 1}`}
-          className={`max-h-screen max-w-full object-contain ${getTransitionClass()}`}
-          style={{ opacity, transition: transitionStyle }}
-        />
+        <div className="w-full h-full flex items-center justify-center">
+          <img
+            key={currentItem.id}
+            src={currentItem.url}
+            alt={`Slide ${currentIndex + 1}`}
+            className={`max-h-screen max-w-full object-contain ${getTransitionClass()}`}
+            style={{ opacity, transition: transitionStyle }}
+          />
+        </div>
       );
     }
     return (
@@ -227,7 +236,7 @@ const Slideshow: React.FC = () => {
 
   return (
     <div
-      className="fixed inset-0 bg-black flex items-center justify-center"
+      className="fixed inset-0 bg-black flex items-center justify-center overflow-hidden"
       onMouseMove={() => setShowControlsBar(true)}
       onMouseLeave={() => { if (!isSettingsPanelOpen) setShowControlsBar(false);}}
     >
