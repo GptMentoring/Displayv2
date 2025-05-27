@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from './supabase';
+import { Database } from './database.types';
 
+type ContentItem = Database['public']['Tables']['content_items']['Row'];
 type Settings = {
   duration: number;
   transition: 'fade' | 'slide' | 'zoom';
@@ -28,11 +30,10 @@ const defaultSettings: Settings = {
 };
 
 export const useSlideshowData = () => {
-  const [items, setItems] = useState<any[]>([]);
+  const [items, setItems] = useState<ContentItem[]>([]);
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -65,14 +66,12 @@ export const useSlideshowData = () => {
 
         if (settingsData && settingsData.value) {
           try {
-            const parsedSettings = JSON.parse(settingsData.value);
+            const parsedSettings = JSON.parse(settingsData.value as string);
             setSettings(prevSettings => ({ ...prevSettings, ...parsedSettings }));
           } catch (parseError) {
             console.error('Error parsing settings:', parseError);
           }
         }
-
-        setInitialized(true);
       } catch (err: any) {
         setError(`Failed to load slideshow data. Please refresh the page. Error: ${err.message}`);
         console.error(err);
@@ -89,7 +88,9 @@ export const useSlideshowData = () => {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'content_items' },
-        () => fetchData()
+        () => {
+          fetchData(); // Refetch all data on any change
+        }
       )
       .subscribe();
 
@@ -122,5 +123,5 @@ export const useSlideshowData = () => {
     };
   }, []);
 
-  return { items, settings, isLoading, error, setSettings, initialized };
+  return { items, settings, isLoading, error, setSettings };
 };
