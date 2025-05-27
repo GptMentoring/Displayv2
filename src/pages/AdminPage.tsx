@@ -5,7 +5,6 @@ import UploadForm from '../components/UploadForm';
 import ContentList from '../components/ContentList';
 import SlideshowSettings from '../components/SlideshowSettings';
 import { supabase } from '../lib/supabase';
-import { useSlideshowData } from '../lib/useSlideshowData';
 import { Database } from '../lib/database.types';
 
 type ContentItem = Database['public']['Tables']['content_items']['Row'];
@@ -14,7 +13,7 @@ const AdminPage: React.FC = () => {
   const navigate = useNavigate();
   const [contentItems, setContentItems] = useState<ContentItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { settings } = useSlideshowData();
+  const [slideshowDuration, setSlideshowDuration] = useState(10); // Default 10 seconds
 
   useEffect(() => {
     const checkAuthAndFetchData = async () => {
@@ -26,6 +25,7 @@ const AdminPage: React.FC = () => {
       }
 
       fetchContentItems();
+      fetchSettings();
     };
 
     checkAuthAndFetchData();
@@ -69,6 +69,26 @@ const AdminPage: React.FC = () => {
       console.error('Error fetching content items:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('id', 'slideshow_duration')
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching settings:', error);
+      }
+
+      if (data) {
+        setSlideshowDuration(parseInt(data.value, 10));
+      }
+    } catch (error) {
+      console.error('Error fetching settings:', error);
     }
   };
 
@@ -133,7 +153,7 @@ const AdminPage: React.FC = () => {
           </div>
           
           <div>
-            <SlideshowSettings />
+            <SlideshowSettings initialDuration={slideshowDuration} />
           </div>
         </div>
       </main>

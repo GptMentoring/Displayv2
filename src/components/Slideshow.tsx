@@ -13,13 +13,6 @@ const Slideshow: React.FC = () => {
   const navigate = useNavigate();
   const { items, settings, isLoading, error, setSettings: updateGlobalSettings } = useSlideshowData();
 
-  // Ensure we have a valid currentIndex
-  useEffect(() => {
-    if (items.length > 0 && currentIndex >= items.length) {
-      setCurrentIndex(0);
-    }
-  }, [items.length, currentIndex]);
-
   const [showControlsBar, setShowControlsBar] = useState(true); // For mouse hover controls
   const [isSettingsPanelOpen, setIsSettingsPanelOpen] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -28,29 +21,23 @@ const Slideshow: React.FC = () => {
 
   // Handle slide rotation
   useEffect(() => {
-    if (items.length === 0 || isSettingsPanelOpen) {
+    if (items.length === 0 || settings.layoutMode === 'quadrant' || isSettingsPanelOpen) {
       return;
     }
 
-    // Calculate how many slides we need to show
-    const totalSlides = settings.layoutMode === 'quadrant' 
-      ? Math.ceil(imageItems.length / 3)
-      : items.length;
-
-    if (totalSlides <= 1) return; // Don't rotate if we don't have enough content
-
+    // Only start interval if there are items, not in quadrant mode, and settings panel is closed
     const effectiveDuration = (settings.duration || 10) * 1000;
 
     const interval = setInterval(() => {
       setIsTransitioning(true);
       setTimeout(() => {
-        setCurrentIndex((prevIndex) => (prevIndex + 1) % (settings.layoutMode === 'quadrant' ? imageItems.length : items.length));
+        setCurrentIndex((prevIndex) => (prevIndex + 1) % items.length);
         setIsTransitioning(false);
       }, 500); // Shorter than typical transition, matches animation
     }, effectiveDuration);
 
     return () => clearInterval(interval);
-  }, [items.length, settings.layoutMode, settings.duration, isSettingsPanelOpen, imageItems.length]);
+  }, [items.length, settings.duration, settings.layoutMode, isSettingsPanelOpen, settings]); // Added settings to dep array
 
   // Effect for progress bar
   useEffect(() => {
@@ -141,19 +128,17 @@ const Slideshow: React.FC = () => {
   const renderRegularLayoutContent = () => {
     if (!currentItem) return null;
     const isActive = true; // In regular mode, the currentItem is always the one to display
-    const opacity = isTransitioning ? 0 : 1;
+    const opacity = isTransitioning && isActive ? 0 : 1;
 
     if (currentItem.type === 'image') {
       return (
-        <div className="w-full h-full flex items-center justify-center">
-          <img
-            key={currentItem.id}
-            src={currentItem.url}
-            alt={`Slide ${currentIndex + 1}`}
-            className={`max-h-screen max-w-full object-contain ${getTransitionClass()}`}
-            style={{ opacity, transition: transitionStyle }}
-          />
-        </div>
+        <img
+          key={currentItem.id}
+          src={currentItem.url}
+          alt={`Slide ${currentIndex + 1}`}
+          className={`max-h-screen max-w-full object-contain ${getTransitionClass()}`}
+          style={{ opacity, transition: transitionStyle }}
+        />
       );
     }
     return (
@@ -171,13 +156,7 @@ const Slideshow: React.FC = () => {
   };
 
   const renderQuadrantLayoutContent = () => {
-    // Use currentIndex to rotate through images in quadrant mode too
-    const rotatedImages = [...imageItems];
-    if (rotatedImages.length > 3) {
-      const offset = Math.floor(currentIndex / 3) * 3;
-      rotatedImages.push(...rotatedImages.splice(0, offset % rotatedImages.length));
-    }
-    const visibleImageItems = rotatedImages.slice(0, 3);
+    const visibleImageItems = imageItems.slice(0, 3);
     
     // Determine which iframe to display based on settings
     let quadrantIframe: ContentItem | undefined = undefined;
@@ -236,7 +215,7 @@ const Slideshow: React.FC = () => {
 
   return (
     <div
-      className="fixed inset-0 bg-black flex items-center justify-center overflow-hidden"
+      className="fixed inset-0 bg-black flex items-center justify-center"
       onMouseMove={() => setShowControlsBar(true)}
       onMouseLeave={() => { if (!isSettingsPanelOpen) setShowControlsBar(false);}}
     >
