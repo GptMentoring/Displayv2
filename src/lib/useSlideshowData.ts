@@ -8,7 +8,10 @@ type Settings = {
   transition: 'fade' | 'slide' | 'zoom';
   showControls: boolean;
   layoutMode: 'regular' | 'quadrant';
-  quadrantIframeId?: string | null; // ID of the ContentItem to display in the quadrant's iframe slot
+  quadrantIframeIds: {
+    bottomLeft?: string | null;
+    bottomRight?: string | null;
+  };
 };
 
 const defaultSettings: Settings = {
@@ -16,7 +19,10 @@ const defaultSettings: Settings = {
   transition: 'fade',
   showControls: true,
   layoutMode: 'regular',
-  quadrantIframeId: null,
+  quadrantIframeIds: {
+    bottomLeft: null,
+    bottomRight: null,
+  },
 };
 
 export const useSlideshowData = () => {

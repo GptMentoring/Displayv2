@@ -156,17 +156,16 @@ const Slideshow: React.FC = () => {
   };
 
   const renderQuadrantLayoutContent = () => {
-    const visibleImageItems = imageItems.slice(0, 3);
+    const visibleImageItems = imageItems.slice(0, 2);
     
-    // Determine which iframe to display based on settings
-    let quadrantIframe: ContentItem | undefined = undefined;
-    if (settings.quadrantIframeId) {
-      quadrantIframe = iframeItems.find(item => item.id === settings.quadrantIframeId);
-    }
-    // Fallback to the first available iframe if selected one isn't found or none is selected
-    if (!quadrantIframe && iframeItems.length > 0) {
-      quadrantIframe = iframeItems[0];
-    }
+    // Get selected iframes or fall back to defaults
+    const bottomLeftIframe = settings.quadrantIframeIds.bottomLeft
+      ? iframeItems.find(item => item.id === settings.quadrantIframeIds.bottomLeft)
+      : iframeItems[0];
+
+    const bottomRightIframe = settings.quadrantIframeIds.bottomRight
+      ? iframeItems.find(item => item.id === settings.quadrantIframeIds.bottomRight)
+      : iframeItems[1];
 
     return (
       <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-1 bg-black p-1">
@@ -184,7 +183,7 @@ const Slideshow: React.FC = () => {
           </div>
         ))}
         {/* Fill remaining image slots if less than 3 images */}
-        {Array.from({ length: Math.max(0, 3 - visibleImageItems.length) }).map((_, i) => (
+        {Array.from({ length: Math.max(0, 2 - visibleImageItems.length) }).map((_, i) => (
           <div
             key={`empty-${i}`}
             className="relative flex items-center justify-center bg-black"
@@ -193,21 +192,44 @@ const Slideshow: React.FC = () => {
           </div>
         ))}
         {/* IFrame quadrant */}
-        <div className="bg-gray-800">
-          {quadrantIframe && (
+        {/* Bottom Left IFrame */}
+        <div className="bg-gray-800 relative">
+          {bottomLeftIframe ? (
             <iframe
-              key={quadrantIframe.id}
-              src={quadrantIframe.url}
-              title={`Embedded quadrant content - ${quadrantIframe.name || 'Untitled'}`}
+              key={bottomLeftIframe.id}
+              src={bottomLeftIframe.url}
+              title={`Bottom Left - ${bottomLeftIframe.name || 'Untitled'}`}
               className="w-full h-full border-0"
               sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-presentation"
               referrerPolicy="origin"
               allow="fullscreen"
               allowFullScreen
               style={{ opacity: isTransitioning ? 0 : 1, transition: transitionStyle }}
-            />
+            />) : (
+            <div className="w-full h-full flex items-center justify-center text-white">
+              No IFrame selected
+            </div>
           )}
-           {!quadrantIframe && <div className="w-full h-full flex items-center justify-center text-white">No IFrame selected or available</div>}
+        </div>
+        
+        {/* Bottom Right IFrame */}
+        <div className="bg-gray-800 relative">
+          {bottomRightIframe ? (
+            <iframe
+              key={bottomRightIframe.id}
+              src={bottomRightIframe.url}
+              title={`Bottom Right - ${bottomRightIframe.name || 'Untitled'}`}
+              className="w-full h-full border-0"
+              sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-presentation"
+              referrerPolicy="origin"
+              allow="fullscreen"
+              allowFullScreen
+              style={{ opacity: isTransitioning ? 0 : 1, transition: transitionStyle }}
+            />) : (
+            <div className="w-full h-full flex items-center justify-center text-white">
+              No IFrame selected
+            </div>
+          )}
         </div>
       </div>
     );
@@ -341,46 +363,70 @@ const Slideshow: React.FC = () => {
                   <ul className="list-disc list-inside text-xs text-gray-600 space-y-1">
                     <li>Top-Left: Displays the 1st available image (by sort order).</li>
                     <li>Top-Right: Displays the 2nd available image.</li>
-                    <li>Bottom-Left: Displays the 3rd available image.</li>
                     <li>
-                      Bottom-Right: Displays an IFrame. 
-                      You can select which IFrame using the dropdown below. 
-                      If no IFrame is selected, it defaults to the first available IFrame.
+                      Bottom Half: Select iframes to display in bottom quadrants.
+                      If none selected, defaults to first available iframes.
                     </li>
                   </ul>
-                  {imageItems.length < 3 && (
+                  {imageItems.length < 2 && (
                     <p className="mt-2 text-xs text-amber-700">
-                      Note: Fewer than 3 images are available. Some image quadrants may be empty or show duplicates if the same image is re-used by sort order.
+                      Note: Fewer than 2 images are available. Some image quadrants may be empty.
                     </p>
                   )}
                 </div>
+                
+                {/* Bottom Left IFrame Selection */}
                 <div>
-                  <label htmlFor="quadrantIframe" className="block text-sm font-medium text-gray-700 mb-1">
-                    Bottom-Right Quadrant IFrame Source
+                  <label htmlFor="bottomLeftIframe" className="block text-sm font-medium text-gray-700 mb-1">
+                    Bottom Left IFrame
                   </label>
                   <select
-                    id="quadrantIframe"
-                    value={settings.quadrantIframeId || ''}
+                    id="bottomLeftIframe"
+                    value={settings.quadrantIframeIds.bottomLeft || ''}
                     onChange={(e) => updateGlobalSettings(prev => ({
                       ...prev,
-                      quadrantIframeId: e.target.value || null
+                      quadrantIframeIds: {
+                        ...prev.quadrantIframeIds,
+                        bottomLeft: e.target.value || null
+                      }
                     }))}
                     className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
                     disabled={iframeItems.length === 0}
                   >
-                    <option value="">{iframeItems.length === 0 ? 'No IFrames available' : 'Select an IFrame (or default)'}</option>
+                    <option value="">Select Bottom Left IFrame</option>
                     {iframeItems.map(iframe => (
                       <option key={iframe.id} value={iframe.id}>
                         {iframe.name || iframe.url} ({iframe.id.substring(0,6)})
                       </option>
                     ))}
                   </select>
-                  {iframeItems.length > 0 && !settings.quadrantIframeId && (
-                      <p className="mt-1 text-xs text-gray-500">Defaulting to the first available IFrame.</p>
-                  )}
-                  {settings.quadrantIframeId && !iframeItems.find(item => item.id === settings.quadrantIframeId) && (
-                      <p className="mt-1 text-xs text-orange-600">The selected IFrame no longer exists. Please choose another.</p>
-                   )}
+                </div>
+                
+                {/* Bottom Right IFrame Selection */}
+                <div className="mt-4">
+                  <label htmlFor="bottomRightIframe" className="block text-sm font-medium text-gray-700 mb-1">
+                    Bottom Right IFrame
+                  </label>
+                  <select
+                    id="bottomRightIframe"
+                    value={settings.quadrantIframeIds.bottomRight || ''}
+                    onChange={(e) => updateGlobalSettings(prev => ({
+                      ...prev,
+                      quadrantIframeIds: {
+                        ...prev.quadrantIframeIds,
+                        bottomRight: e.target.value || null
+                      }
+                    }))}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                    disabled={iframeItems.length === 0}
+                  >
+                    <option value="">Select Bottom Right IFrame</option>
+                    {iframeItems.map(iframe => (
+                      <option key={iframe.id} value={iframe.id}>
+                        {iframe.name || iframe.url} ({iframe.id.substring(0,6)})
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
             )}
