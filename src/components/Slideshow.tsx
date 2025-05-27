@@ -158,14 +158,14 @@ const Slideshow: React.FC = () => {
   const renderQuadrantLayoutContent = () => {
     const visibleImageItems = imageItems.slice(0, 2);
     
-    // Get selected iframes or fall back to defaults
-    const bottomLeftIframe = settings.quadrantIframeIds.bottomLeft
+    // Get selected iframes if enabled, otherwise null
+    const bottomLeftIframe = settings.quadrantIframeIds.bottomLeftEnabled && settings.quadrantIframeIds.bottomLeft
       ? iframeItems.find(item => item.id === settings.quadrantIframeIds.bottomLeft)
-      : iframeItems[0];
+      : null;
 
-    const bottomRightIframe = settings.quadrantIframeIds.bottomRight
+    const bottomRightIframe = settings.quadrantIframeIds.bottomRightEnabled && settings.quadrantIframeIds.bottomRight
       ? iframeItems.find(item => item.id === settings.quadrantIframeIds.bottomRight)
-      : iframeItems[1];
+      : null;
 
     return (
       <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-1 bg-black p-1">
@@ -378,55 +378,99 @@ const Slideshow: React.FC = () => {
                 {/* Bottom Left IFrame Selection */}
                 <div>
                   <label htmlFor="bottomLeftIframe" className="block text-sm font-medium text-gray-700 mb-1">
-                    Bottom Left IFrame
+                    Bottom Left IFrame {settings.quadrantIframeIds.bottomLeftEnabled ? '(Enabled)' : '(Disabled)'}
                   </label>
-                  <select
-                    id="bottomLeftIframe"
-                    value={settings.quadrantIframeIds.bottomLeft || ''}
-                    onChange={(e) => updateGlobalSettings(prev => ({
-                      ...prev,
-                      quadrantIframeIds: {
-                        ...prev.quadrantIframeIds,
-                        bottomLeft: e.target.value || null
-                      }
-                    }))}
-                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                    disabled={iframeItems.length === 0}
-                  >
-                    <option value="">Select Bottom Left IFrame</option>
-                    {iframeItems.map(iframe => (
-                      <option key={iframe.id} value={iframe.id}>
-                        {iframe.name || iframe.url} ({iframe.id.substring(0,6)})
-                      </option>
-                    ))}
-                  </select>
+                  <div className="space-y-2">
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="bottomLeftEnabled"
+                        checked={settings.quadrantIframeIds.bottomLeftEnabled}
+                        onChange={(e) => updateGlobalSettings(prev => ({
+                          ...prev,
+                          quadrantIframeIds: {
+                            ...prev.quadrantIframeIds,
+                            bottomLeftEnabled: e.target.checked
+                          }
+                        }))}
+                        className="mr-2"
+                      />
+                      <label htmlFor="bottomLeftEnabled" className="text-sm text-gray-600">
+                        Enable Bottom Left IFrame
+                      </label>
+                    </div>
+                    {settings.quadrantIframeIds.bottomLeftEnabled && (
+                      <select
+                        id="bottomLeftIframe"
+                        value={settings.quadrantIframeIds.bottomLeft || ''}
+                        onChange={(e) => updateGlobalSettings(prev => ({
+                          ...prev,
+                          quadrantIframeIds: {
+                            ...prev.quadrantIframeIds,
+                            bottomLeft: e.target.value || null
+                          }
+                        }))}
+                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                        disabled={iframeItems.length === 0}
+                      >
+                        <option value="">Select Bottom Left IFrame</option>
+                        {iframeItems.map(iframe => (
+                          <option key={iframe.id} value={iframe.id}>
+                            {iframe.name || iframe.url} ({iframe.id.substring(0,6)})
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
                 </div>
                 
                 {/* Bottom Right IFrame Selection */}
                 <div className="mt-4">
                   <label htmlFor="bottomRightIframe" className="block text-sm font-medium text-gray-700 mb-1">
-                    Bottom Right IFrame
+                    Bottom Right IFrame {settings.quadrantIframeIds.bottomRightEnabled ? '(Enabled)' : '(Disabled)'}
                   </label>
-                  <select
-                    id="bottomRightIframe"
-                    value={settings.quadrantIframeIds.bottomRight || ''}
-                    onChange={(e) => updateGlobalSettings(prev => ({
-                      ...prev,
-                      quadrantIframeIds: {
-                        ...prev.quadrantIframeIds,
-                        bottomRight: e.target.value || null
-                      }
-                    }))}
-                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                    disabled={iframeItems.length === 0}
-                  >
-                    <option value="">Select Bottom Right IFrame</option>
-                    {iframeItems.map(iframe => (
-                      <option key={iframe.id} value={iframe.id}>
-                        {iframe.name || iframe.url} ({iframe.id.substring(0,6)})
-                      </option>
-                    ))}
-                  </select>
+                  <div className="space-y-2">
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="bottomRightEnabled"
+                        checked={settings.quadrantIframeIds.bottomRightEnabled}
+                        onChange={(e) => updateGlobalSettings(prev => ({
+                          ...prev,
+                          quadrantIframeIds: {
+                            ...prev.quadrantIframeIds,
+                            bottomRightEnabled: e.target.checked
+                          }
+                        }))}
+                        className="mr-2"
+                      />
+                      <label htmlFor="bottomRightEnabled" className="text-sm text-gray-600">
+                        Enable Bottom Right IFrame
+                      </label>
+                    </div>
+                    {settings.quadrantIframeIds.bottomRightEnabled && (
+                      <select
+                        id="bottomRightIframe"
+                        value={settings.quadrantIframeIds.bottomRight || ''}
+                        onChange={(e) => updateGlobalSettings(prev => ({
+                          ...prev,
+                          quadrantIframeIds: {
+                            ...prev.quadrantIframeIds,
+                            bottomRight: e.target.value || null
+                          }
+                        }))}
+                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                        disabled={iframeItems.length === 0}
+                      >
+                        <option value="">Select Bottom Right IFrame</option>
+                        {iframeItems.map(iframe => (
+                          <option key={iframe.id} value={iframe.id}>
+                            {iframe.name || iframe.url} ({iframe.id.substring(0,6)})
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
