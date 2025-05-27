@@ -13,7 +13,7 @@ const Slideshow: React.FC = () => {
   const navigate = useNavigate();
   const { items, settings, isLoading, error, setSettings: updateGlobalSettings } = useSlideshowData();
 
-  const [showControlsBar, setShowControlsBar] = useState(true); // For mouse hover controls
+  const [showControlsBar, setShowControlsBar] = useState(true);
   const [isSettingsPanelOpen, setIsSettingsPanelOpen] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -22,7 +22,7 @@ const Slideshow: React.FC = () => {
 
   // Handle slide rotation
   useEffect(() => {
-    if (items.length === 0 || isSettingsPanelOpen) {
+    if (items.length === 0 || isSettingsPanelOpen || isLoading) {
       return;
     }
 
@@ -46,8 +46,8 @@ const Slideshow: React.FC = () => {
 
   // Effect for progress bar
   useEffect(() => {
-    if (settings.layoutMode !== 'regular' || isSettingsPanelOpen || items.length === 0 || isTransitioning) {
-      if (isTransitioning) { // Reset progress to 0 when transition starts
+    if (settings.layoutMode !== 'regular' || isSettingsPanelOpen || items.length === 0 || isTransitioning || isLoading) {
+      if (isTransitioning) {
         setProgress(0);
       }
       return;
@@ -106,7 +106,10 @@ const Slideshow: React.FC = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-white text-xl">Loading slideshow...</div>
+        <div className="text-white text-xl flex items-center gap-2">
+          <span className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></span>
+          <span>Loading slideshow...</span>
+        </div>
       </div>
     );
   }
