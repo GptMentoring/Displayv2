@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Hide scrollbars for iframes */
+iframe {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+iframe::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+/* Base transitions */
+.transition-base {
+  transition-property: opacity, transform;
+  transition-duration: 500ms;
+  transition-timing-function: ease-in-out;
+}
