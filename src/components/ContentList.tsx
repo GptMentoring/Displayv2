@@ -47,7 +47,7 @@ const SortableItem: React.FC<{ item: ContentItem; isDeleting: boolean; handleDel
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    zIndex: isDragging ? 10 : undefined,
+    zIndex: isDragging ? 10 : undefined, // Ensure dragging item is on top
     opacity: isDragging ? 0.8 : 1,
   };
 
@@ -57,7 +57,7 @@ const SortableItem: React.FC<{ item: ContentItem; isDeleting: boolean; handleDel
       style={style}
       className={`bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm ${
         isDragging ? 'shadow-xl' : 'hover:shadow-md'
-      } transition-shadow flex items-stretch`}
+      } transition-shadow flex items-stretch`} // Use flex for layout
     >
       {/* Drag Handle */}
       <div
@@ -70,7 +70,7 @@ const SortableItem: React.FC<{ item: ContentItem; isDeleting: boolean; handleDel
       </div>
 
       {/* Item Content */}
-      <div className="flex-grow">
+      <div className="flex-grow"> {/* Make this part take remaining space */}
         <div className="aspect-video bg-gray-100 relative">
           {item.type === 'image' ? (
             <img
@@ -129,6 +129,7 @@ const SortableItem: React.FC<{ item: ContentItem; isDeleting: boolean; handleDel
   );
 };
 
+
 const ContentList: React.FC<ContentListProps> = ({ items, setItems, onContentDeleted, onReorder }) => {
   const [isDeleting, setIsDeleting] = useState<Record<string, boolean>>({});
   const [isSavingOrder, setIsSavingOrder] = useState(false);
@@ -143,63 +144,17 @@ const ContentList: React.FC<ContentListProps> = ({ items, setItems, onContentDel
   const handleDelete = async (item: ContentItem) => {
     if (isDeleting[item.id] || isSavingOrder) return;
 
-    // For iframes, show a confirmation dialog
-    if (item.type === 'iframe') {
-      const confirmDelete = window.confirm(
-        'Are you sure you want to delete this iframe? This action cannot be undone.'
-      );
-      if (!confirmDelete) return;
-    }
-
     setIsDeleting(prev => ({ ...prev, [item.id]: true }));
     try {
-      // For images, delete from storage first
       if (item.type === 'image' && item.storage_path) {
         const { error: storageError } = await supabase.storage
           .from('content')
           .remove([item.storage_path]);
-        if (storageError) throw new Error(storageError.message);
+        if (storageError) console.error('Error deleting from storage:', storageError);
       }
-
-      // Delete the content item
       const { error } = await supabase.from('content_items').delete().eq('id', item.id);
       if (error) throw new Error(error.message);
-
-      // If it's an iframe, check and update settings if this iframe was being used
-      if (item.type === 'iframe') {
-        const { data: settingsData } = await supabase
-          .from('settings')
-          .select('value')
-          .eq('id', 'slideshow_settings')
-          .single();
-
-        if (settingsData?.value) {
-          const settings = JSON.parse(settingsData.value);
-          let needsUpdate = false;
-
-          if (settings.quadrantIframeIds) {
-            // Check both bottom quadrants
-            if (settings.quadrantIframeIds.bottomLeft === item.id) {
-              settings.quadrantIframeIds.bottomLeft = null;
-              needsUpdate = true;
-            }
-            if (settings.quadrantIframeIds.bottomRight === item.id) {
-              settings.quadrantIframeIds.bottomRight = null;
-              needsUpdate = true;
-            }
-          }
-
-          // Update settings if needed
-          if (needsUpdate) {
-            await supabase
-              .from('settings')
-              .update({ value: JSON.stringify(settings) })
-              .eq('id', 'slideshow_settings');
-          }
-        }
-      }
-
-      onContentDeleted(); // Refresh the content list
+      onContentDeleted(); // This will refetch and update items in AdminPage
     } catch (error) {
       console.error('Error deleting item:', error);
       alert('Failed to delete item. Please try again.');
@@ -219,8 +174,10 @@ const ContentList: React.FC<ContentListProps> = ({ items, setItems, onContentDel
       setIsSavingOrder(true);
       try {
         await onReorder(reorderedItems);
+        // Optionally show success feedback here
       } catch (error) {
-        setItems(items); // Revert optimistic update on error
+        // Revert optimistic update on error
+        setItems(items); 
         alert('Failed to save new order. Please try again.');
         console.error('Error saving order:', error);
       } finally {
