@@ -81,6 +81,17 @@ const SortableItem: React.FC<{ item: ContentItem; isDeleting: boolean; handleDel
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-gray-100">
               <Globe className="h-12 w-12 text-gray-400" />
+              <button
+                onClick={() => handleDelete(item)}
+                disabled={isDeleting}
+                className={`absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-2 rounded-full shadow-md transition-colors ${
+                  isDeleting ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+                title="Delete iframe"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span className="sr-only">Delete iframe</span>
+              </button>
               <span className="sr-only">iframe content</span>
             </div>
           )}
@@ -97,17 +108,19 @@ const SortableItem: React.FC<{ item: ContentItem; isDeleting: boolean; handleDel
                 {item.type}
               </span>
             </div>
-            <button
-              onClick={() => handleDelete(item)}
-              disabled={isDeleting}
-              className={`text-red-500 hover:bg-red-50 p-2 rounded-full transition-colors ${
-                isDeleting ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
-              title={`Delete ${item.type}`}
-            >
-              <Trash2 className="h-4 w-4" />
-              <span className="sr-only">Delete {item.type}</span>
-            </button>
+            {item.type === 'image' && (
+              <button
+                onClick={() => handleDelete(item)}
+                disabled={isDeleting}
+                className={`text-red-500 hover:bg-red-50 p-2 rounded-full transition-colors ${
+                  isDeleting ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+                title="Delete image"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span className="sr-only">Delete image</span>
+              </button>
+            )}
           </div>
           <div className="mt-2 truncate text-sm text-gray-500">
             {item.type === 'iframe' ? (
