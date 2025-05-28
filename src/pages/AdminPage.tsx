@@ -5,30 +5,39 @@ import UploadForm from '../components/UploadForm';
 import ContentList from '../components/ContentList';
 import SlideshowSettings from '../components/SlideshowSettings';
 import { supabase } from '../lib/supabase';
-import { Database } from '../lib/database.types';
+// No longer need Database or ContentItem here as they are handled by the hook
+// import { Database } from '../lib/database.types'; 
+import { useAdminData } from '../hooks/useAdminData'; // Import the hook
 
-type ContentItem = Database['public']['Tables']['content_items']['Row'];
+// type ContentItem = Database['public']['Tables']['content_items']['Row']; // Handled by hook
 
 const AdminPage: React.FC = () => {
   const navigate = useNavigate();
-  const [contentItems, setContentItems] = useState<ContentItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // Use the custom hook for content items management
+  const { 
+    contentItems, 
+    isLoading: isLoadingContent, 
+    error: contentError, 
+    handleReorderContent, 
+    fetchContentItems // This is the refresh/refetch function from the hook
+  } = useAdminData();
+  
   const [slideshowDuration, setSlideshowDuration] = useState(10); // Default 10 seconds
 
   useEffect(() => {
-    const checkAuthAndFetchData = async () => {
+    const checkAuthAndFetchPageData = async () => {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
       if (sessionError || !session) {
         navigate('/login');
         return;
       }
-
-      fetchContentItems();
+      // Initial fetch of content items is managed by useAdminData's own useEffect.
+      // We only need to fetch page-specific settings here.
       fetchSettings();
     };
 
-    checkAuthAndFetchData();
+    checkAuthAndFetchPageData();
 
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT' || !session) {
@@ -36,84 +45,41 @@ const AdminPage: React.FC = () => {
       }
     });
 
-
-    // Set up realtime subscription
-    const subscription = supabase
-      .channel('admin_content_changes')
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'content_items' }, 
-        fetchContentItems)
-      .subscribe();
+    // Realtime subscription for content_items is handled within useAdminData hook.
 
     return () => {
       authListener?.subscription.unsubscribe();
-      subscription.unsubscribe();
+      // Realtime subscription cleanup for content_items is handled by the hook.
     };
-  }, [navigate]);
-
-  const fetchContentItems = async () => {
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('content_items')
-        .select('*')
-        .order('sort_order', { ascending: true, nullsLast: true })
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        throw error;
-      }
-
-      setContentItems(data || []);
-    } catch (error) {
-      console.error('Error fetching content items:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [navigate]); 
 
   const fetchSettings = async () => {
     try {
       const { data, error } = await supabase
         .from('settings')
         .select('value')
-        .eq('id', 'slideshow_duration')
+        .eq('id', 'slideshow_duration') // Assuming 'slideshow_duration' is the ID for this setting
         .single();
 
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching settings:', error);
+      if (error && error.code !== 'PGRST116') { // PGRST116: no rows found
+        console.error('Error fetching slideshow_duration settings:', error);
       }
 
-      if (data) {
-        setSlideshowDuration(parseInt(data.value, 10));
+      if (data && data.value) {
+        const parsedDuration = parseInt(data.value, 10);
+        if (!isNaN(parsedDuration) && parsedDuration > 0) {
+          setSlideshowDuration(parsedDuration);
+        } else {
+          console.warn('Invalid slideshow duration value from settings:', data.value);
+        }
       }
     } catch (error) {
-      console.error('Error fetching settings:', error);
+      console.error('Exception while fetching settings:', error);
     }
   };
 
-  const handleReorderContent = async (reorderedItems: ContentItem[]) => {
-    try {
-      const updates = reorderedItems.map((item, index) => ({
-        id: item.id,
-        sort_order: index,
-      }));
-
-      const { error } = await supabase.from('content_items').upsert(updates);
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      // Update local state optimistically
-      setContentItems(reorderedItems);
-    } catch (error) {
-      console.error('Error reordering content:', error);
-      alert('Failed to reorder content. Please try again.');
-      // Revert to previous state by refetching
-      fetchContentItems();
-    }
-  };
+  // fetchContentItems (for initial load/realtime) and handleReorderContent are now from useAdminData hook.
+  // The fetchContentItems returned by the hook can be used for manual refresh if needed.
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -135,25 +101,42 @@ const AdminPage: React.FC = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
-            <UploadForm onContentAdded={fetchContentItems} />
+            <UploadForm onContentAdded={fetchContentItems} /> {/* Use fetchContentItems from hook to refresh list after adding */}
             
             <div className="mt-8">
               <h2 className="text-xl font-bold text-gray-800 mb-4">Content Items</h2>
-              {isLoading ? (
+              {contentError && (
+                <div className="text-red-500 text-center py-4">
+                  Error loading content: {contentError}
+                  <button 
+                    onClick={() => fetchContentItems()} // Manual refresh via hook's function
+                    className="ml-2 px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+              {isLoadingContent ? (
                 <div className="text-center py-8">Loading content...</div>
               ) : (
                 <ContentList
-                  items={contentItems}
-                  setItems={setContentItems}
-                  onContentDeleted={fetchContentItems}
-                  onReorder={handleReorderContent}
+                  items={contentItems} // From hook
+                  // setItems prop is removed as state is managed by the hook.
+                  // ContentList will re-render with new items when contentItems from hook changes.
+                  onContentDeleted={fetchContentItems} // Use fetchContentItems from hook to refresh list
+                  onReorder={handleReorderContent} // From hook
                 />
               )}
             </div>
           </div>
           
           <div>
-            <SlideshowSettings initialDuration={slideshowDuration} />
+            <SlideshowSettings initialDuration={slideshowDuration} /> 
+            {/* 
+              SlideshowSettings might need an onSave callback if it's supposed to update 
+              'slideshow_duration' in the database. This is outside the scope of useAdminData.
+              For now, it just receives the initialDuration.
+            */}
           </div>
         </div>
       </main>

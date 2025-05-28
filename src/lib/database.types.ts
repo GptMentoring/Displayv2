@@ -25,6 +25,8 @@ export interface Database {
           created_at: string
           sort_order: number | null
           name: string | null
+          category: string // Corresponds to content_category ENUM
+          tags: string[] | null
         }
         Insert: {
           id?: string
@@ -34,6 +36,8 @@ export interface Database {
           created_at?: string
           sort_order?: number | null
           name?: string | null
+          category?: string // Corresponds to content_category ENUM, default in DB
+          tags?: string[] | null
         }
         Update: {
           id?: string
@@ -43,8 +47,13 @@ export interface Database {
           created_at?: string
           sort_order?: number | null
           name?: string | null
+          category?: string // Corresponds to content_category ENUM
+          tags?: string[] | null
         }
       }
+    }
+    Enums: {
+      content_category: "vision_board" | "kpi" | "monthly_goal"
     }
   }
 }

@@ -120,9 +120,34 @@ const SortableItem: React.FC<{ item: ContentItem; isDeleting: boolean; handleDel
                 {item.url}
               </a>
             ) : (
-              <span>{item.name || new URL(item.url).pathname.split('/').pop()}</span>
+              <span className="truncate">{item.name || new URL(item.url).pathname.split('/').pop()}</span>
             )}
           </div>
+
+          {/* Display Category */}
+          {item.category && (
+            <div className="mt-2 pt-2 border-t border-gray-100">
+              <span className="text-xs font-semibold text-gray-500">Category: </span>
+              <span className="text-xs text-gray-700 capitalize">
+                {/* Basic capitalization, more robust can be done with a helper */}
+                {item.category.replace('_', ' ')} 
+              </span>
+            </div>
+          )}
+
+          {/* Display Tags */}
+          {item.tags && item.tags.length > 0 && (
+            <div className="mt-1 pt-1 border-t border-gray-100 flex flex-wrap gap-1">
+              {item.tags.map(tag => (
+                <span 
+                  key={tag} 
+                  className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs font-medium"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

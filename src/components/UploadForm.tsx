@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
-import { Upload, Link2, PlayCircle, X } from 'lucide-react';
+import { Upload, Link2, X } from 'lucide-react'; // Removed PlayCircle as it's in IframeUploadTab
 import { supabase } from '../lib/supabase';
 import * as DOMPurify from 'isomorphic-dompurify';
+import ImageUploadTab, { contentCategories } from './ImageUploadTab'; // Import categories as well
+import IframeUploadTab from './IframeUploadTab';
+import IframePreviewModal from './IframePreviewModal'; 
 
 interface UploadFormProps {
   onContentAdded: () => void;
@@ -11,12 +14,29 @@ const UploadForm: React.FC<UploadFormProps> = ({ onContentAdded }) => {
   const [activeTab, setActiveTab] = useState<'image' | 'iframe'>('image');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [iframeCode, setIframeCode] = useState('');
+  
+  // State for new fields
+  const [category, setCategory] = useState<string>(contentCategories[0].value); // Default to first category
+  const [tags, setTags] = useState<string>(''); // Comma-separated string
+
   const [isUploading, setIsUploading] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handlePreview = () => {
+  // Reset category to default when tab changes
+  useEffect(() => {
+    if (activeTab === 'iframe') {
+      setCategory('kpi'); // Default 'kpi' for iframes
+    } else {
+      setCategory(contentCategories[0].value); // Default to first category for images
+    }
+    setTags(''); // Reset tags when tab changes
+    setError(null); // Clear errors
+  }, [activeTab]);
+  // handleIframeCodeChange is effectively replaced by passing setIframeCode to IframeUploadTab
+
+  const handlePreview = () => { // This function remains as it's called by IframeUploadTab
     if (!iframeCode) {
       setError('Please enter the iframe code first');
       return;
@@ -38,18 +58,6 @@ const UploadForm: React.FC<UploadFormProps> = ({ onContentAdded }) => {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Invalid iframe code');
     }
-  };
-
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      setImageFile(e.target.files[0]);
-      setError(null);
-    }
-  };
-
-  const handleIframeCodeChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setIframeCode(e.target.value);
-    setError(null);
   };
 
   const extractIframeSrc = (html: string): string | null => {
@@ -133,12 +141,16 @@ const UploadForm: React.FC<UploadFormProps> = ({ onContentAdded }) => {
       }
 
       // 3. Save to content_items table
+      const parsedTags = tags.split(',').map(tag => tag.trim()).filter(tag => tag);
+
       const { error: insertError } = await supabase
         .from('content_items')
         .insert({
           type: 'image',
           url: publicUrlData.publicUrl,
           storage_path: filePath,
+          category: category, // Add category
+          tags: parsedTags,   // Add parsed tags
         });
 
       if (insertError) {
@@ -147,6 +159,8 @@ const UploadForm: React.FC<UploadFormProps> = ({ onContentAdded }) => {
 
       // Success
       setImageFile(null);
+      setCategory(contentCategories[0].value); // Reset category
+      setTags(''); // Reset tags
       onContentAdded();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred while uploading');
@@ -178,6 +192,8 @@ const UploadForm: React.FC<UploadFormProps> = ({ onContentAdded }) => {
           type: 'iframe',
           url: iframeSrc,
           storage_path: null,
+          category: category, // Add category
+          tags: tags.split(',').map(tag => tag.trim()).filter(tag => tag), // Add parsed tags
         });
 
       if (error) {
@@ -186,6 +202,8 @@ const UploadForm: React.FC<UploadFormProps> = ({ onContentAdded }) => {
 
       // Success
       setIframeCode('');
+      setCategory('kpi'); // Reset category to KPI for iframe tab default
+      setTags(''); // Reset tags
       onContentAdded();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred while adding the iframe');
@@ -238,60 +256,45 @@ const UploadForm: React.FC<UploadFormProps> = ({ onContentAdded }) => {
       
       <form onSubmit={handleSubmit} className="space-y-4">
         {activeTab === 'image' ? (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Image File
-            </label>
-            <input
-              type="file"
-              accept=".png,.jpg,.jpeg,.gif"
-              onChange={handleImageChange}
-              className="w-full p-2 border border-gray-300 rounded-md"
-            />
-            {imageFile && (
-              <div className="mt-2 text-sm text-gray-600">
-                Selected: {imageFile.name}
-              </div>
-            )}
-          </div>
+          <ImageUploadTab
+            imageFile={imageFile}
+            onImageFileChange={(file) => {
+              setImageFile(file);
+              setError(null); 
+            }}
+            category={category}
+            onCategoryChange={setCategory}
+            tags={tags}
+            onTagsChange={setTags}
+          />
         ) : (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              iframe Code
-            </label>
-            <textarea
-              value={iframeCode}
-              onChange={handleIframeCodeChange}
-              placeholder="Paste your Databox URL or iframe code here..."
-              className="w-full p-2 border border-gray-300 rounded-md h-32 font-mono text-sm"
-            />
-            <p className="mt-1 text-xs text-gray-500">
-              Enter a Databox URL or paste the complete iframe code
-            </p>
-            <div className="mt-2 flex gap-2">
-              <button
-                type="button"
-                onClick={handlePreview}
-                className="flex items-center gap-1 px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition-colors"
-              >
-                <PlayCircle className="h-4 w-4" />
-                Test iframe
-              </button>
-            </div>
-          </div>
+          <IframeUploadTab
+            iframeCode={iframeCode}
+            onIframeCodeChange={(code) => {
+              setIframeCode(code);
+              setError(null); 
+            }}
+            onPreview={handlePreview}
+            category={category}
+            onCategoryChange={setCategory}
+            tags={tags}
+            onTagsChange={setTags}
+          />
         )}
 
         {error && (
-          <div className="text-red-500 text-sm p-2 bg-red-50 rounded-md">
+          <div className="text-red-500 text-sm p-2 bg-red-50 rounded-md mt-2">
             {error}
           </div>
         )}
 
         <button
           type="submit"
-          disabled={isUploading}
+          disabled={isUploading || (activeTab === 'image' && !imageFile) || (activeTab === 'iframe' && !iframeCode.trim())}
           className={`w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md transition-colors ${
-            isUploading ? 'opacity-70 cursor-not-allowed' : ''
+            (isUploading || (activeTab === 'image' && !imageFile) || (activeTab === 'iframe' && !iframeCode.trim())) 
+            ? 'opacity-70 cursor-not-allowed' 
+            : ''
           }`}
         >
           {isUploading
@@ -302,39 +305,11 @@ const UploadForm: React.FC<UploadFormProps> = ({ onContentAdded }) => {
         </button>
       </form>
       
-      {/* Preview Modal */}
-      {isPreviewOpen && previewUrl && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-[90vw] h-[90vh] flex flex-col">
-            <div className="p-4 border-b flex justify-between items-center">
-              <h3 className="text-lg font-semibold">iframe Preview</h3>
-              <button
-                onClick={() => setIsPreviewOpen(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <div className="flex-1 bg-gray-100 p-4">
-              <iframe
-                src={previewUrl}
-                className="w-full h-full border-0 rounded-lg bg-white shadow-inner overflow-hidden"
-                sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-presentation"
-                referrerPolicy="origin"
-                allow="fullscreen"
-              />
-            </div>
-            <div className="p-4 border-t bg-gray-50 flex justify-end gap-2">
-              <button
-                onClick={() => setIsPreviewOpen(false)}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <IframePreviewModal
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        previewUrl={previewUrl}
+      />
     </div>
   );
 };
