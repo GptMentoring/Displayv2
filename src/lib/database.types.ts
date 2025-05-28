@@ -4,24 +4,58 @@ import { X, Settings as SettingsIcon } from 'lucide-react'; // Renamed Settings 
 import { useSlideshowData } from '../lib/useSlideshowData';
 import { Database } from '../lib/database.types';
 
-type ContentItem = {
-  id: string
-  type: 'image' | 'iframe'
-  url: string
-  storage_path: string | null
-  created_at: string
-  sort_order: number
-  name: string | null
-};
-// Settings type is now primarily managed by useSlideshowData, but we might need it for props or local component state
-type SlideshowSettings = ReturnType<typeof useSlideshowData>['settings'];
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
 
 export type QuadrantConfig = {
-  [key: string]: {
+  [key in 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight']: {
     type: 'image' | 'iframe';
     contentId: string | null;
   };
 };
+
+export interface Database {
+  public: {
+    Tables: {
+      content_items: {
+        Row: {
+          id: string
+          type: 'image' | 'iframe'
+          url: string
+          storage_path: string | null
+          created_at: string
+          sort_order: number | null
+          name: string | null
+        }
+        Insert: {
+          id?: string
+          type: 'image' | 'iframe'
+          url: string
+          storage_path?: string | null
+          created_at?: string
+          sort_order?: number | null
+          name?: string | null
+        }
+        Update: {
+          id?: string
+          type?: 'image' | 'iframe'
+          url?: string
+          storage_path?: string | null
+          created_at?: string
+          sort_order?: number | null
+          name?: string | null
+        }
+      }
+
+type ContentItem = Database['public']['Tables']['content_items']['Row'];
+// Settings type is now primarily managed by useSlideshowData, but we might need it for props or local component state
+type SlideshowSettings = ReturnType<typeof useSlideshowData>['settings'];
+
 
 const Slideshow: React.FC = () => {
   const navigate = useNavigate();
@@ -170,81 +204,65 @@ const Slideshow: React.FC = () => {
   };
 
   const renderQuadrantLayoutContent = () => {
-    const visibleImageItems = imageItems.slice(0, 2);
-    
-    // Get selected iframes or fall back to defaults
-    const bottomLeftIframe = settings.quadrantIframeIds.bottomLeft
-      ? iframeItems.find(item => item.id === settings.quadrantIframeIds.bottomLeft)
-      : iframeItems[0];
+    const renderQuadrant = (position: keyof QuadrantConfig) => {
+      const config = settings.quadrantConfig[position];
+      const isImage = config.type === 'image';
+      
+      if (isImage) {
+        // For image type, either show selected image or first available by sort order
+        const imageToShow = config.contentId
+          ? imageItems.find(item => item.id === config.contentId)
+          : imageItems[0];
 
-    const bottomRightIframe = settings.quadrantIframeIds.bottomRight
-      ? iframeItems.find(item => item.id === settings.quadrantIframeIds.bottomRight)
-      : iframeItems[1];
-
-    return (
-      <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-1 bg-black p-1">
-        {visibleImageItems.map((image, index) => (
-          <div
-            key={image.id}
-            className="relative flex items-center justify-center bg-black"
-          >
+        return imageToShow ? (
+          <div key={position} className="relative flex items-center justify-center bg-black">
             <img
-              src={image.url}
-              alt={`Content ${index + 1}`}
+              src={imageToShow.url}
+              alt={`${position} content`}
               className={`max-h-full max-w-full object-contain ${getTransitionClass()}`}
               style={{ opacity: isTransitioning ? 0 : 1, transition: transitionStyle }}
             />
           </div>
-        ))}
-        {/* Fill remaining image slots if less than 3 images */}
-        {Array.from({ length: Math.max(0, 2 - visibleImageItems.length) }).map((_, i) => (
-          <div
-            key={`empty-${i}`}
-            className="relative flex items-center justify-center bg-black"
-          >
-            <div className="text-gray-500 text-sm">No image available</div>
+        ) : (
+          <div key={position} className="flex items-center justify-center bg-black text-gray-500">
+            No image available
           </div>
-        ))}
-        {/* IFrame quadrant */}
-        {/* Bottom Left IFrame */}
-        <div className="bg-gray-800 relative">
-          {bottomLeftIframe ? (
-            <iframe
-              key={bottomLeftIframe.id}
-              src={bottomLeftIframe.url}
-              title={`Bottom Left - ${bottomLeftIframe.name || 'Untitled'}`}
-              className="w-full h-full border-0"
-              sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-presentation"
-              referrerPolicy="origin"
-              allow="fullscreen"
-              allowFullScreen
-              style={{ opacity: isTransitioning ? 0 : 1, transition: transitionStyle }}
-            />) : (
-            <div className="w-full h-full flex items-center justify-center text-white">
-              No IFrame selected
-            </div>
-          )}
-        </div>
-        
-        {/* Bottom Right IFrame */}
-        <div className="bg-gray-800 relative">
-          {bottomRightIframe ? (
-            <iframe
-              key={bottomRightIframe.id}
-              src={bottomRightIframe.url}
-              title={`Bottom Right - ${bottomRightIframe.name || 'Untitled'}`}
-              className="w-full h-full border-0"
-              sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-presentation"
-              referrerPolicy="origin"
-              allow="fullscreen"
-              allowFullScreen
-              style={{ opacity: isTransitioning ? 0 : 1, transition: transitionStyle }}
-            />) : (
-            <div className="w-full h-full flex items-center justify-center text-white">
-              No IFrame selected
-            </div>
-          )}
-        </div>
+        );
+      } else {
+        // For iframe type, show selected iframe or first available
+        const iframeToShow = config.contentId
+          ? iframeItems.find(item => item.id === config.contentId)
+          : iframeItems[0];
+
+        return (
+          <div key={position} className="bg-gray-800">
+            {iframeToShow ? (
+              <iframe
+                src={iframeToShow.url}
+                title={`${position} - ${iframeToShow.name || 'Untitled'}`}
+                className="w-full h-full border-0"
+                sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-presentation"
+                referrerPolicy="origin"
+                allow="fullscreen"
+                allowFullScreen
+                style={{ opacity: isTransitioning ? 0 : 1, transition: transitionStyle }}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-white">
+                No IFrame available
+              </div>
+            )}
+          </div>
+        );
+      }
+    };
+    
+    return (
+      <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-1 bg-black p-1">
+        {renderQuadrant('topLeft')}
+        {renderQuadrant('topRight')}
+        {renderQuadrant('bottomLeft')}
+        {renderQuadrant('bottomRight')}
       </div>
     );
   };
@@ -373,74 +391,65 @@ const Slideshow: React.FC = () => {
             {settings.layoutMode === 'quadrant' && (
               <div className="space-y-4 mt-2 p-3 bg-gray-50 rounded-md border border-gray-200">
                 <div>
-                  <h4 className="text-sm font-semibold text-gray-600 mb-2">Quadrant Layout Configuration:</h4>
-                  <ul className="list-disc list-inside text-xs text-gray-600 space-y-1">
-                    <li>Top-Left: Displays the 1st available image (by sort order).</li>
-                    <li>Top-Right: Displays the 2nd available image.</li>
-                    <li>
-                      Bottom Half: Select iframes to display in bottom quadrants.
-                      If none selected, defaults to first available iframes.
-                    </li>
-                  </ul>
-                  {imageItems.length < 2 && (
-                    <p className="mt-2 text-xs text-amber-700">
-                      Note: Fewer than 2 images are available. Some image quadrants may be empty.
-                    </p>
-                  )}
-                </div>
-                
-                {/* Bottom Left IFrame Selection */}
-                <div>
-                  <label htmlFor="bottomLeftIframe" className="block text-sm font-medium text-gray-700 mb-1">
-                    Bottom Left IFrame
-                  </label>
-                  <select
-                    id="bottomLeftIframe"
-                    value={settings.quadrantIframeIds.bottomLeft || ''}
-                    onChange={(e) => updateGlobalSettings(prev => ({
-                      ...prev,
-                      quadrantIframeIds: {
-                        ...prev.quadrantIframeIds,
-                        bottomLeft: e.target.value || null
-                      }
-                    }))}
-                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                    disabled={iframeItems.length === 0}
-                  >
-                    <option value="">Select Bottom Left IFrame</option>
-                    {iframeItems.map(iframe => (
-                      <option key={iframe.id} value={iframe.id}>
-                        {iframe.name || iframe.url} ({iframe.id.substring(0,6)})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                
-                {/* Bottom Right IFrame Selection */}
-                <div className="mt-4">
-                  <label htmlFor="bottomRightIframe" className="block text-sm font-medium text-gray-700 mb-1">
-                    Bottom Right IFrame
-                  </label>
-                  <select
-                    id="bottomRightIframe"
-                    value={settings.quadrantIframeIds.bottomRight || ''}
-                    onChange={(e) => updateGlobalSettings(prev => ({
-                      ...prev,
-                      quadrantIframeIds: {
-                        ...prev.quadrantIframeIds,
-                        bottomRight: e.target.value || null
-                      }
-                    }))}
-                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                    disabled={iframeItems.length === 0}
-                  >
-                    <option value="">Select Bottom Right IFrame</option>
-                    {iframeItems.map(iframe => (
-                      <option key={iframe.id} value={iframe.id}>
-                        {iframe.name || iframe.url} ({iframe.id.substring(0,6)})
-                      </option>
-                    ))}
-                  </select>
+                  <h4 className="text-sm font-semibold text-gray-600 mb-4">Quadrant Layout Configuration</h4>
+                  {(['topLeft', 'topRight', 'bottomLeft', 'bottomRight'] as const).map((position) => (
+                    <div key={position} className="mb-6 last:mb-0">
+                      <h5 className="text-sm font-medium text-gray-700 mb-2 capitalize">
+                        {position.replace(/([A-Z])/g, ' $1').trim()}
+                      </h5>
+                      <div className="space-y-2">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                            Content Type
+                          </label>
+                          <select
+                            value={settings.quadrantConfig[position].type}
+                            onChange={(e) => updateGlobalSettings(prev => ({
+                              ...prev,
+                              quadrantConfig: {
+                                ...prev.quadrantConfig,
+                                [position]: {
+                                  type: e.target.value as 'image' | 'iframe',
+                                  contentId: null // Reset contentId when type changes
+                                }
+                              }
+                            }))}
+                            className="w-full p-2 text-sm border border-gray-300 rounded-md"
+                          >
+                            <option value="image">Image Carousel</option>
+                            <option value="iframe">IFrame</option>
+                          </select>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                            Content Selection
+                          </label>
+                          <select
+                            value={settings.quadrantConfig[position].contentId || ''}
+                            onChange={(e) => updateGlobalSettings(prev => ({
+                              ...prev,
+                              quadrantConfig: {
+                                ...prev.quadrantConfig,
+                                [position]: {
+                                  ...prev.quadrantConfig[position],
+                                  contentId: e.target.value || null
+                                }
+                              }
+                            }))}
+                            className="w-full p-2 text-sm border border-gray-300 rounded-md"
+                          >
+                            <option value="">Auto (First Available)</option>
+                            {(settings.quadrantConfig[position].type === 'image' ? imageItems : iframeItems).map(item => (
+                              <option key={item.id} value={item.id}>
+                                {item.name || item.url} ({item.id.substring(0,6)})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
