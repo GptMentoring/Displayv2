@@ -165,9 +165,9 @@ const Slideshow: React.FC = () => {
               return imageToShow ? (
                 <div key={position} className="relative flex items-center justify-center bg-black">
                   <img
-                    src={imageToShow.url}
-                    alt={`${position} content`}
-                    className={`max-h-full max-w-full object-contain ${getTransitionClass()}`}
+                    src={imageToShow.url} 
+                    alt={`${position} content`} 
+                    className={`w-full h-full object-cover ${getTransitionClass()}`}
                     style={{ opacity: isTransitioning ? 0 : 1, transition: transitionStyle }}
                   />
                 </div>
@@ -209,9 +209,9 @@ const Slideshow: React.FC = () => {
           currentItem.type === 'image' ? (
             <img
               key={currentItem.id}
-              src={currentItem.url}
-              alt={`Slide ${currentIndex + 1}`}
-              className={`max-h-screen max-w-full object-contain ${getTransitionClass()}`}
+              src={currentItem.url} 
+              alt={`Slide ${currentIndex + 1}`} 
+              className={`w-screen h-screen object-cover ${getTransitionClass()}`}
               style={{ opacity: isTransitioning ? 0 : 1, transition: transitionStyle }}
             />
           ) : (
