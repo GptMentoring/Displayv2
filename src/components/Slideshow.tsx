@@ -18,6 +18,8 @@ const Slideshow: React.FC = () => {
     bottomLeft: 0,
     bottomRight: 0,
   });
+  const quadrantTimers = useRef<{ [key: string]: number }>({});
+  const quadrantLastUpdate = useRef<{ [key: string]: number }>({});
   const [showControlsBar, setShowControlsBar] = useState(true);
   const [isSettingsPanelOpen, setIsSettingsPanelOpen] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -86,27 +88,64 @@ const Slideshow: React.FC = () => {
   // Effect for quadrant image rotation
   useEffect(() => {
     if (settings.layoutMode !== 'quadrant' || isSettingsPanelOpen || imageItems.length === 0) {
+      // Clear all existing timers when conditions aren't met
+      Object.values(quadrantTimers.current).forEach(timer => clearInterval(timer));
+      quadrantTimers.current = {};
       return;
     }
 
     const effectiveDuration = (settings.duration || 10) * 1000;
     const positions = ['topLeft', 'topRight', 'bottomLeft', 'bottomRight'] as const;
-    
-    const intervals = positions.map(position => {
+
+    // Clear any existing intervals first
+    Object.values(quadrantTimers.current).forEach(timer => clearInterval(timer));
+    quadrantTimers.current = {};
+
+    // Set up new intervals for each position that should rotate
+    positions.forEach(position => {
       if (settings.quadrantConfig[position].type !== 'image') {
-        return null;
+        return;
       }
 
-      return setInterval(() => {
-        setQuadrantIndices(prev => ({
-          ...prev,
-          [position]: (prev[position] + 1) % imageItems.length
-        }));
-      }, effectiveDuration);
+      // Initialize last update time if not set
+      if (!quadrantLastUpdate.current[position]) {
+        quadrantLastUpdate.current[position] = Date.now();
+      }
+
+      const timer = setInterval(() => {
+        const now = Date.now();
+        // Ensure minimum time has passed to prevent rapid updates
+        if (now - (quadrantLastUpdate.current[position] || 0) >= effectiveDuration) {
+          setQuadrantIndices(prev => {
+            // Get current index and calculate next one, ensuring we don't repeat
+            const currentIndex = prev[position];
+            let nextIndex = (currentIndex + 1) % imageItems.length;
+            
+            // If we have more than one image, make sure we don't show the same image
+            // in multiple quadrants at the same time
+            if (imageItems.length > 1) {
+              const usedIndices = Object.entries(prev)
+                .filter(([key, _]) => key !== position && 
+                       settings.quadrantConfig[key as keyof typeof settings.quadrantConfig].type === 'image')
+                .map(([_, index]) => index);
+              
+              while (usedIndices.includes(nextIndex)) {
+                nextIndex = (nextIndex + 1) % imageItems.length;
+              }
+            }
+
+            quadrantLastUpdate.current[position] = now;
+            return { ...prev, [position]: nextIndex };
+          });
+        }
+      }, Math.min(1000, effectiveDuration / 2)); // Check more frequently than the duration
+
+      quadrantTimers.current[position] = timer;
     });
 
     return () => {
-      intervals.forEach(interval => interval && clearInterval(interval));
+      Object.values(quadrantTimers.current).forEach(timer => clearInterval(timer));
+      quadrantTimers.current = {};
     };
   }, [settings.layoutMode, settings.duration, isSettingsPanelOpen, imageItems.length, settings.quadrantConfig]);
 

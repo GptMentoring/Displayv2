@@ -29,40 +29,38 @@ const QuadrantDisplay: React.FC<QuadrantDisplayProps> = ({
       {(['topLeft', 'topRight', 'bottomLeft', 'bottomRight'] as const).map((position) => {
         const config = quadrantConfig[position];
         const isImage = config.type === 'image';
-        let itemToShow: ContentItem | undefined = undefined;
+        let itemToShow: ContentItem | undefined;
 
         if (isImage) {
           if (config.contentId) {
-            // Find specific image by ID from all items, then verify it's an image
             const foundItem = items.find(item => item.id === config.contentId);
             if (foundItem && foundItem.type === 'image') {
               itemToShow = foundItem;
-            } else if (foundItem) {
-              // console.warn(`Quadrant ${position} configured for image ID ${config.contentId}, but item is type ${foundItem.type}. Falling back.`);
             }
           }
-          // Fallback to carousel logic if no valid contentId or item not found/wrong type
+          // Use carousel logic if no specific content ID is set or item wasn't found
           if (!itemToShow && imageItems.length > 0) {
-            itemToShow = imageItems[quadrantIndices[position] % imageItems.length];
+            const currentIndex = quadrantIndices[position] % imageItems.length;
+            itemToShow = imageItems[currentIndex];
           }
         } else { // type is 'iframe'
           if (config.contentId) {
-            // Find specific iframe by ID from all items, then verify it's an iframe
             const foundItem = items.find(item => item.id === config.contentId);
             if (foundItem && foundItem.type === 'iframe') {
               itemToShow = foundItem;
-            } else if (foundItem) {
-              // console.warn(`Quadrant ${position} configured for iframe ID ${config.contentId}, but item is type ${foundItem.type}. Falling back.`);
             }
           }
-           // Fallback to first available iframe if no valid contentId or item not found/wrong type
+          // Fallback to first available iframe if needed
           if (!itemToShow && iframeItems.length > 0) {
             itemToShow = iframeItems[0]; 
           }
         }
 
         return (
-          <div key={position} className={`relative flex items-center justify-center bg-black ${isImage ? '' : 'bg-gray-800'}`}>
+          <div 
+            key={`${position}-${itemToShow?.id || 'empty'}`} 
+            className={`relative flex items-center justify-center bg-black ${isImage ? '' : 'bg-gray-800'}`}
+          >
             {itemToShow ? (
               isImage ? (
                 <img
