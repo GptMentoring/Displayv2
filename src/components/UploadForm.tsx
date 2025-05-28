@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Upload, Link2, X } from 'lucide-react'; // Removed PlayCircle as it's in IframeUploadTab
 import { supabase } from '../lib/supabase';
 import * as DOMPurify from 'isomorphic-dompurify';
