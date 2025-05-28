@@ -91,7 +91,7 @@ const SortableItem: React.FC<{ item: ContentItem; isDeleting: boolean; handleDel
               {item.type === 'image' ? (
                 <Image className="h-4 w-4 text-blue-500" />
               ) : (
-                <Globe className="h-4 w-4 text-green-500" />
+                <Globe className="h-4 w-4 text-purple-500" />
               )}
               <span className="font-medium text-gray-700 capitalize">
                 {item.type}
@@ -100,13 +100,13 @@ const SortableItem: React.FC<{ item: ContentItem; isDeleting: boolean; handleDel
             <button
               onClick={() => handleDelete(item)}
               disabled={isDeleting}
-              className={`text-red-500 hover:bg-red-50 p-2 rounded-full ${
+              className={`text-red-500 hover:bg-red-50 p-2 rounded-full transition-colors ${
                 isDeleting ? 'opacity-50 cursor-not-allowed' : ''
               }`}
-              title="Delete item"
+              title={`Delete ${item.type}`}
             >
               <Trash2 className="h-4 w-4" />
-              <span className="sr-only">Delete</span>
+              <span className="sr-only">Delete {item.type}</span>
             </button>
           </div>
           <div className="mt-2 truncate text-sm text-gray-500">
@@ -146,12 +146,14 @@ const ContentList: React.FC<ContentListProps> = ({ items, setItems, onContentDel
 
     setIsDeleting(prev => ({ ...prev, [item.id]: true }));
     try {
-      if (item.type === 'image' && item.storage_path) {
+      // Delete from storage if it's an image
+      if (item.type === 'image' && item.storage_path) { 
         const { error: storageError } = await supabase.storage
           .from('content')
           .remove([item.storage_path]);
         if (storageError) console.error('Error deleting from storage:', storageError);
       }
+      
       const { error } = await supabase.from('content_items').delete().eq('id', item.id);
       if (error) throw new Error(error.message);
       onContentDeleted(); // This will refetch and update items in AdminPage
