@@ -211,7 +211,7 @@ const Slideshow: React.FC = () => {
               key={currentItem.id}
               src={currentItem.url} 
               alt={`Slide ${currentIndex + 1}`} 
-              className={`max-w-[90vw] max-h-[90vh] object-contain ${getTransitionClass()}`}
+              className={`w-auto h-[85vh] max-w-[95vw] object-contain ${getTransitionClass()}`}
               style={{ opacity: isTransitioning ? 0 : 1, transition: transitionStyle }}
             />
           ) : (
@@ -219,7 +219,7 @@ const Slideshow: React.FC = () => {
               key={currentItem.id}
               src={currentItem.url}
               title="Embedded content"
-              className="w-full h-screen border-0"
+              className="w-[95vw] h-[85vh] border-0"
               sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-presentation"
               referrerPolicy="origin"
               allowFullScreen
