@@ -1,13 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Settings as SettingsIcon } from 'lucide-react'; // Renamed Settings to avoid conflict
+import { X, Settings as SettingsIcon } from 'lucide-react';
 import { useSlideshowData } from '../lib/useSlideshowData';
-import { Database } from '../lib/database.types';
+import { Database, QuadrantConfig } from '../lib/database.types';
 
 type ContentItem = Database['public']['Tables']['content_items']['Row'];
-// Settings type is now primarily managed by useSlideshowData, but we might need it for props or local component state
 type SlideshowSettings = ReturnType<typeof useSlideshowData>['settings'];
-
 
 const Slideshow: React.FC = () => {
   const navigate = useNavigate();
@@ -18,12 +16,30 @@ const Slideshow: React.FC = () => {
     bottomLeft: 0,
     bottomRight: 0
   });
-
-  const [showControlsBar, setShowControlsBar] = useState(true); // For mouse hover controls
+  const [showControlsBar, setShowControlsBar] = useState(true);
   const [isSettingsPanelOpen, setIsSettingsPanelOpen] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [progress, setProgress] = useState(0); // Progress bar state (0 to 100)
+  const [progress, setProgress] = useState(0);
+
+  // Memoize filtered items
+  const imageItems = useMemo(() => items.filter(item => item.type === 'image'), [items]);
+  const iframeItems = useMemo(() => items.filter(item => item.type === 'iframe'), [items]);
+
+  const handleExit = useCallback(() => {
+    navigate('/admin');
+  }, [navigate]);
+
+  const getTransitionClass = useCallback(() => {
+    switch (settings.transition) {
+      case 'slide':
+        return 'animate-slide-in';
+      case 'zoom':
+        return 'animate-zoom-in';
+      default:
+        return 'animate-fade-in';
+    }
+  }, [settings.transition]);
 
   // Handle slide rotation
   useEffect(() => {
@@ -31,30 +47,28 @@ const Slideshow: React.FC = () => {
       return;
     }
 
-    // Only start interval if there are items, not in quadrant mode, and settings panel is closed
     const effectiveDuration = (settings.duration || 10) * 1000;
-
     const interval = setInterval(() => {
       setIsTransitioning(true);
       setTimeout(() => {
         setCurrentIndex((prevIndex) => (prevIndex + 1) % items.length);
         setIsTransitioning(false);
-      }, 500); // Shorter than typical transition, matches animation
+      }, 500);
     }, effectiveDuration);
 
     return () => clearInterval(interval);
-  }, [items.length, settings.duration, settings.layoutMode, isSettingsPanelOpen, settings]); // Added settings to dep array
+  }, [items.length, settings.duration, settings.layoutMode, isSettingsPanelOpen]);
 
   // Effect for progress bar
   useEffect(() => {
     if (settings.layoutMode !== 'regular' || isSettingsPanelOpen || items.length === 0 || isTransitioning) {
-      if (isTransitioning) { // Reset progress to 0 when transition starts
+      if (isTransitioning) {
         setProgress(0);
       }
       return;
     }
 
-    setProgress(0); // Reset progress for new slide
+    setProgress(0);
     const startTime = Date.now();
     const slideDurationMs = (settings.duration || 10) * 1000;
     let animationFrameId: number;
@@ -74,62 +88,7 @@ const Slideshow: React.FC = () => {
     return () => {
       cancelAnimationFrame(animationFrameId);
     };
-  }, [currentIndex, settings.duration, settings.layoutMode, isSettingsPanelOpen, items.length, isTransitioning, settings]); // Added settings and isTransitioning
-
-  const handleExit = useCallback(() => {
-    navigate('/admin');
-  }, [navigate]);
-
-  const getTransitionClass = useCallback(() => {
-    switch (settings.transition) {
-      case 'slide':
-        return 'animate-slide-in';
-      case 'zoom':
-        return 'animate-zoom-in';
-      default: // fade
-        return 'animate-fade-in';
-    }
-  }, [settings.transition]);
-
-
-  // Memoize filtered items to prevent re-calculation on every render
-  const imageItems = useMemo(() => items.filter(item => item.type === 'image'), [items]);
-  const iframeItems = useMemo(() => items.filter(item => item.type === 'iframe'), [items]);
-
-
-  // Controls visibility logic: show if settings panel is open OR if mouse is over the slideshow
-  const actualShowControls = isSettingsPanelOpen || showControlsBar;
-
-  // Moved renderContent outside to be memoizable if needed, or to become a separate component
-  // For now, it's simple enough to be inline or defined within the component body.
-  // If it were more complex, React.memo and useCallback for props would be considered.
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-white text-xl">Loading slideshow...</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-white text-xl p-4 text-center">{error}</div>
-      </div>
-    );
-  }
-
-  if (items.length === 0) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-white text-xl">No content available for slideshow. <button onClick={handleExit} className="underline">Go to Admin</button></div>
-      </div>
-    );
-  }
-
-  const currentItem = items[currentIndex];
-  const transitionStyle = 'opacity 0.5s ease-in-out';
+  }, [currentIndex, settings.duration, settings.layoutMode, isSettingsPanelOpen, items.length, isTransitioning]);
 
   // Effect for quadrant image rotation
   useEffect(() => {
@@ -158,99 +117,33 @@ const Slideshow: React.FC = () => {
     };
   }, [settings.layoutMode, settings.duration, isSettingsPanelOpen, imageItems.length, settings.quadrantConfig]);
 
-  const renderRegularLayoutContent = () => {
-    if (!currentItem) return null;
-    const isActive = true; // In regular mode, the currentItem is always the one to display
-    const opacity = isTransitioning && isActive ? 0 : 1;
-
-    if (currentItem.type === 'image') {
-      return (
-        <img
-          key={currentItem.id}
-          src={currentItem.url}
-          alt={`Slide ${currentIndex + 1}`}
-          className={`max-h-screen max-w-full object-contain ${getTransitionClass()}`}
-          style={{ opacity, transition: transitionStyle }}
-        />
-      );
-    }
+  if (isLoading) {
     return (
-      <iframe
-        key={currentItem.id}
-        src={currentItem.url}
-        title="Embedded content"
-        className="w-full h-screen border-0"
-        sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-presentation"
-        referrerPolicy="origin"
-        allowFullScreen
-        style={{ opacity, transition: transitionStyle }}
-      />
-    );
-  };
-
-  const renderQuadrantLayoutContent = () => {
-    const renderQuadrant = (position: keyof QuadrantConfig) => {
-      const config = settings.quadrantConfig[position];
-      const isImage = config.type === 'image';
-      
-      if (isImage) {
-        const currentIndex = quadrantIndices[position];
-        const imageToShow = config.contentId 
-          ? imageItems.find(item => item.id === config.contentId) 
-          : imageItems[currentIndex];
-
-        return imageToShow ? (
-          <div key={position} className="relative flex items-center justify-center bg-black">
-            <img
-              src={imageToShow.url}
-              alt={`${position} content`}
-              className={`max-h-full max-w-full object-contain ${getTransitionClass()}`}
-              style={{ opacity: isTransitioning ? 0 : 1, transition: transitionStyle }}
-            />
-          </div>
-        ) : (
-          <div key={position} className="flex items-center justify-center bg-black text-gray-500">
-            No image available
-          </div>
-        );
-      } else {
-        // For iframe type, show selected iframe or first available
-        const iframeToShow = config.contentId
-          ? iframeItems.find(item => item.id === config.contentId)
-          : iframeItems[0];
-
-        return (
-          <div key={position} className="bg-gray-800">
-            {iframeToShow ? (
-              <iframe
-                src={iframeToShow.url}
-                title={`${position} - ${iframeToShow.name || 'Untitled'}`}
-                className="w-full h-full border-0"
-                sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-presentation"
-                referrerPolicy="origin"
-                allow="fullscreen"
-                allowFullScreen
-                style={{ opacity: isTransitioning ? 0 : 1, transition: transitionStyle }}
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-white">
-                No IFrame available
-              </div>
-            )}
-          </div>
-        );
-      }
-    };
-    
-    return (
-      <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-1 bg-black p-1">
-        {renderQuadrant('topLeft')}
-        {renderQuadrant('topRight')}
-        {renderQuadrant('bottomLeft')}
-        {renderQuadrant('bottomRight')}
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-white text-xl">Loading slideshow...</div>
       </div>
     );
-  };
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-white text-xl p-4 text-center">{error}</div>
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-white text-xl">No content available for slideshow. <button onClick={handleExit} className="underline">Go to Admin</button></div>
+      </div>
+    );
+  }
+
+  const currentItem = items[currentIndex];
+  const transitionStyle = 'opacity 0.5s ease-in-out';
+  const actualShowControls = isSettingsPanelOpen || showControlsBar;
 
   return (
     <div
@@ -258,9 +151,84 @@ const Slideshow: React.FC = () => {
       onMouseMove={() => setShowControlsBar(true)}
       onMouseLeave={() => { if (!isSettingsPanelOpen) setShowControlsBar(false);}}
     >
-      {settings.layoutMode === 'quadrant' ? renderQuadrantLayoutContent() : renderRegularLayoutContent()}
+      {settings.layoutMode === 'quadrant' ? (
+        <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-1 bg-black p-1">
+          {(['topLeft', 'topRight', 'bottomLeft', 'bottomRight'] as const).map((position) => {
+            const config = settings.quadrantConfig[position];
+            const isImage = config.type === 'image';
+            
+            if (isImage) {
+              const imageToShow = config.contentId 
+                ? imageItems.find(item => item.id === config.contentId) 
+                : imageItems[quadrantIndices[position]];
 
-      {/* Progress Bar - Only in Regular Mode */}
+              return imageToShow ? (
+                <div key={position} className="relative flex items-center justify-center bg-black">
+                  <img
+                    src={imageToShow.url}
+                    alt={`${position} content`}
+                    className={`max-h-full max-w-full object-contain ${getTransitionClass()}`}
+                    style={{ opacity: isTransitioning ? 0 : 1, transition: transitionStyle }}
+                  />
+                </div>
+              ) : (
+                <div key={position} className="flex items-center justify-center bg-black text-gray-500">
+                  No image available
+                </div>
+              );
+            } else {
+              const iframeToShow = config.contentId
+                ? iframeItems.find(item => item.id === config.contentId)
+                : iframeItems[0];
+
+              return (
+                <div key={position} className="bg-gray-800">
+                  {iframeToShow ? (
+                    <iframe
+                      src={iframeToShow.url}
+                      title={`${position} - ${iframeToShow.name || 'Untitled'}`}
+                      className="w-full h-full border-0"
+                      sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-presentation"
+                      referrerPolicy="origin"
+                      allow="fullscreen"
+                      allowFullScreen
+                      style={{ opacity: isTransitioning ? 0 : 1, transition: transitionStyle }}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-white">
+                      No IFrame available
+                    </div>
+                  )}
+                </div>
+              );
+            }
+          })}
+        </div>
+      ) : (
+        currentItem && (
+          currentItem.type === 'image' ? (
+            <img
+              key={currentItem.id}
+              src={currentItem.url}
+              alt={`Slide ${currentIndex + 1}`}
+              className={`max-h-screen max-w-full object-contain ${getTransitionClass()}`}
+              style={{ opacity: isTransitioning ? 0 : 1, transition: transitionStyle }}
+            />
+          ) : (
+            <iframe
+              key={currentItem.id}
+              src={currentItem.url}
+              title="Embedded content"
+              className="w-full h-screen border-0"
+              sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-presentation"
+              referrerPolicy="origin"
+              allowFullScreen
+              style={{ opacity: isTransitioning ? 0 : 1, transition: transitionStyle }}
+            />
+          )
+        )
+      )}
+
       {settings.layoutMode === 'regular' && items.length > 0 && !isSettingsPanelOpen && (
         <div className="fixed bottom-0 left-0 w-full h-1.5 bg-gray-700/50 z-50">
           <div
@@ -270,7 +238,6 @@ const Slideshow: React.FC = () => {
         </div>
       )}
 
-      {/* Controls Overlay */}
       <div
         className={`fixed top-0 left-0 right-0 p-4 transition-opacity duration-300 ${
           actualShowControls ? 'opacity-100' : 'opacity-0'
@@ -301,7 +268,6 @@ const Slideshow: React.FC = () => {
         </div>
       </div>
 
-      {/* Settings Panel */}
       {isSettingsPanelOpen && (
         <div className="fixed top-16 left-4 bg-white rounded-lg shadow-xl p-6 w-96 z-50">
           <div className="flex justify-between items-center mb-4">
@@ -395,7 +361,7 @@ const Slideshow: React.FC = () => {
                                 ...prev.quadrantConfig,
                                 [position]: {
                                   type: e.target.value as 'image' | 'iframe',
-                                  contentId: null // Reset contentId when type changes
+                                  contentId: null
                                 }
                               }
                             }))}
@@ -438,7 +404,6 @@ const Slideshow: React.FC = () => {
                 </div>
               </div>
             )}
-            {/* Future settings can be added here */}
           </div>
         </div>
       )}
