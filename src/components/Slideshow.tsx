@@ -167,7 +167,7 @@ const Slideshow: React.FC = () => {
                   <img
                     src={imageToShow.url} 
                     alt={`${position} content`} 
-                    className={`w-full h-full object-cover ${getTransitionClass()}`}
+                    className={`max-w-full max-h-full object-contain ${getTransitionClass()}`}
                     style={{ opacity: isTransitioning ? 0 : 1, transition: transitionStyle }}
                   />
                 </div>
@@ -211,7 +211,7 @@ const Slideshow: React.FC = () => {
               key={currentItem.id}
               src={currentItem.url} 
               alt={`Slide ${currentIndex + 1}`} 
-              className={`w-screen h-screen object-cover ${getTransitionClass()}`}
+              className={`max-w-[90vw] max-h-[90vh] object-contain ${getTransitionClass()}`}
               style={{ opacity: isTransitioning ? 0 : 1, transition: transitionStyle }}
             />
           ) : (
