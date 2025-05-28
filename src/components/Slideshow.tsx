@@ -12,6 +12,12 @@ type SlideshowSettings = ReturnType<typeof useSlideshowData>['settings'];
 const Slideshow: React.FC = () => {
   const navigate = useNavigate();
   const { items, settings, isLoading, error, setSettings: updateGlobalSettings } = useSlideshowData();
+  const [quadrantIndices, setQuadrantIndices] = useState({
+    topLeft: 0,
+    topRight: 0,
+    bottomLeft: 0,
+    bottomRight: 0
+  });
 
   const [showControlsBar, setShowControlsBar] = useState(true); // For mouse hover controls
   const [isSettingsPanelOpen, setIsSettingsPanelOpen] = useState(false);
@@ -125,6 +131,33 @@ const Slideshow: React.FC = () => {
   const currentItem = items[currentIndex];
   const transitionStyle = 'opacity 0.5s ease-in-out';
 
+  // Effect for quadrant image rotation
+  useEffect(() => {
+    if (settings.layoutMode !== 'quadrant' || isSettingsPanelOpen || imageItems.length === 0) {
+      return;
+    }
+
+    const effectiveDuration = (settings.duration || 10) * 1000;
+    const positions = ['topLeft', 'topRight', 'bottomLeft', 'bottomRight'] as const;
+    
+    const intervals = positions.map(position => {
+      if (settings.quadrantConfig[position].type !== 'image') {
+        return null;
+      }
+
+      return setInterval(() => {
+        setQuadrantIndices(prev => ({
+          ...prev,
+          [position]: (prev[position] + 1) % imageItems.length
+        }));
+      }, effectiveDuration);
+    });
+
+    return () => {
+      intervals.forEach(interval => interval && clearInterval(interval));
+    };
+  }, [settings.layoutMode, settings.duration, isSettingsPanelOpen, imageItems.length, settings.quadrantConfig]);
+
   const renderRegularLayoutContent = () => {
     if (!currentItem) return null;
     const isActive = true; // In regular mode, the currentItem is always the one to display
@@ -161,10 +194,10 @@ const Slideshow: React.FC = () => {
       const isImage = config.type === 'image';
       
       if (isImage) {
-        // For image type, either show selected image or first available by sort order
-        const imageToShow = config.contentId
-          ? imageItems.find(item => item.id === config.contentId)
-          : imageItems[0];
+        const currentIndex = quadrantIndices[position];
+        const imageToShow = config.contentId 
+          ? imageItems.find(item => item.id === config.contentId) 
+          : imageItems[currentIndex];
 
         return imageToShow ? (
           <div key={position} className="relative flex items-center justify-center bg-black">
