@@ -81,6 +81,20 @@ const SortableItem: React.FC<{ item: ContentItem; isDeleting: boolean; handleDel
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-gray-100">
               <Globe className="h-12 w-12 text-gray-400" />
+              <div className="absolute inset-0 bg-black/5 group hover:bg-black/10 transition-colors">
+                <button
+                  onClick={() => handleDelete(item)}
+                  disabled={isDeleting}
+                  className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 
+                    bg-red-500 hover:bg-red-600 text-white p-3 rounded-full shadow-lg 
+                    transition-all transform group-hover:scale-110
+                    flex items-center gap-2 ${isDeleting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  title="Delete iframe"
+                >
+                  <Trash2 className="h-5 w-5" />
+                  <span className="font-medium">Delete</span>
+                </button>
+              </div>
               <button
                 onClick={() => handleDelete(item)}
                 disabled={isDeleting}
@@ -108,7 +122,7 @@ const SortableItem: React.FC<{ item: ContentItem; isDeleting: boolean; handleDel
                 {item.type}
               </span>
             </div>
-            {item.type === 'image' && (
+            {item.type === 'image' && ( // Only show delete button here for images
               <button
                 onClick={() => handleDelete(item)}
                 disabled={isDeleting}
