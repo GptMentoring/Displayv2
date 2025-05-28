@@ -1,5 +1,6 @@
 import React from 'react';
 import { Database, QuadrantConfig } from '../lib/database.types';
+import { useMemo } from 'react';
 
 type ContentItem = Database['public']['Tables']['content_items']['Row'];
 
@@ -24,6 +25,30 @@ const QuadrantDisplay: React.FC<QuadrantDisplayProps> = ({
   transitionStyle,
   items, // items prop is available for finding by ID
 }) => {
+  // Create a map to track which image indices are used
+  const usedImageIndices = useMemo(() => new Set<number>(), []);
+
+  // Helper function to get next available image index
+  const getNextAvailableImageIndex = (currentIndex: number, maxLength: number) => {
+    let nextIndex = currentIndex % maxLength;
+    if (imageItems.length <= 1) return nextIndex;
+    
+    // Try to find an unused index, but limit attempts to avoid infinite loop
+    let attempts = 0;
+    while (usedImageIndices.has(nextIndex) && attempts < maxLength) {
+      nextIndex = (nextIndex + 1) % maxLength;
+      attempts++;
+    }
+    
+    // If we've tried all indices, clear the set and use the current index
+    if (attempts >= maxLength) {
+      usedImageIndices.clear();
+    }
+    
+    usedImageIndices.add(nextIndex);
+    return nextIndex;
+  };
+
   return (
     <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-1 bg-black p-1">
       {(['topLeft', 'topRight', 'bottomLeft', 'bottomRight'] as const).map((position) => {
@@ -40,7 +65,7 @@ const QuadrantDisplay: React.FC<QuadrantDisplayProps> = ({
           }
           // Use carousel logic if no specific content ID is set or item wasn't found
           if (!itemToShow && imageItems.length > 0) {
-            const currentIndex = quadrantIndices[position] % imageItems.length;
+            const currentIndex = getNextAvailableImageIndex(quadrantIndices[position], imageItems.length);
             itemToShow = imageItems[currentIndex];
           }
         } else { // type is 'iframe'
@@ -50,7 +75,7 @@ const QuadrantDisplay: React.FC<QuadrantDisplayProps> = ({
               itemToShow = foundItem;
             }
           }
-          // Fallback to first available iframe if needed
+          // Fallback to first available iframe if no specific one is selected
           if (!itemToShow && iframeItems.length > 0) {
             itemToShow = iframeItems[0]; 
           }
