@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Settings as SettingsIcon } from 'lucide-react';
 import { useSlideshowData } from '../lib/useSlideshowData';
