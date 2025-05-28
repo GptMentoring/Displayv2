@@ -24,9 +24,8 @@ type ContentItem = Database['public']['Tables']['content_items']['Row'];
 
 interface ContentListProps {
   items: ContentItem[];
-  setItems: React.Dispatch<React.SetStateAction<ContentItem[]>>; // For optimistic update
   onContentDeleted: () => void;
-  onReorder: (reorderedItems: ContentItem[]) => Promise<void>; // To handle saving to DB
+  onReorder: (reorderedItems: ContentItem[]) => Promise<void>;
 }
 
 // Individual Sortable Item Component
@@ -47,7 +46,7 @@ const SortableItem: React.FC<{ item: ContentItem; isDeleting: boolean; handleDel
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    zIndex: isDragging ? 10 : undefined, // Ensure dragging item is on top
+    zIndex: isDragging ? 10 : undefined,
     opacity: isDragging ? 0.8 : 1,
   };
 
@@ -57,9 +56,8 @@ const SortableItem: React.FC<{ item: ContentItem; isDeleting: boolean; handleDel
       style={style}
       className={`bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm ${
         isDragging ? 'shadow-xl' : 'hover:shadow-md'
-      } transition-shadow flex items-stretch`} // Use flex for layout
+      } transition-shadow flex items-stretch`}
     >
-      {/* Drag Handle */}
       <div
         {...attributes}
         {...listeners}
@@ -69,8 +67,7 @@ const SortableItem: React.FC<{ item: ContentItem; isDeleting: boolean; handleDel
         <GripVertical className="h-5 w-5 text-gray-500" />
       </div>
 
-      {/* Item Content */}
-      <div className="flex-grow"> {/* Make this part take remaining space */}
+      <div className="flex-grow">
         <div className="aspect-video bg-gray-100 relative">
           {item.type === 'image' ? (
             <img
@@ -129,7 +126,6 @@ const SortableItem: React.FC<{ item: ContentItem; isDeleting: boolean; handleDel
             <div className="mt-2 pt-2 border-t border-gray-100">
               <span className="text-xs font-semibold text-gray-500">Category: </span>
               <span className="text-xs text-gray-700 capitalize">
-                {/* Basic capitalization, more robust can be done with a helper */}
                 {item.category.replace('_', ' ')} 
               </span>
             </div>
@@ -154,8 +150,7 @@ const SortableItem: React.FC<{ item: ContentItem; isDeleting: boolean; handleDel
   );
 };
 
-
-const ContentList: React.FC<ContentListProps> = ({ items, setItems, onContentDeleted, onReorder }) => {
+const ContentList: React.FC<ContentListProps> = ({ items, onContentDeleted, onReorder }) => {
   const [isDeleting, setIsDeleting] = useState<Record<string, boolean>>({});
   const [isSavingOrder, setIsSavingOrder] = useState(false);
 
@@ -179,7 +174,7 @@ const ContentList: React.FC<ContentListProps> = ({ items, setItems, onContentDel
       }
       const { error } = await supabase.from('content_items').delete().eq('id', item.id);
       if (error) throw new Error(error.message);
-      onContentDeleted(); // This will refetch and update items in AdminPage
+      onContentDeleted();
     } catch (error) {
       console.error('Error deleting item:', error);
       alert('Failed to delete item. Please try again.');
@@ -195,14 +190,10 @@ const ContentList: React.FC<ContentListProps> = ({ items, setItems, onContentDel
       const newIndex = items.findIndex((item) => item.id === over.id);
       const reorderedItems = arrayMove(items, oldIndex, newIndex);
       
-      setItems(reorderedItems); // Optimistic update
       setIsSavingOrder(true);
       try {
         await onReorder(reorderedItems);
-        // Optionally show success feedback here
       } catch (error) {
-        // Revert optimistic update on error
-        setItems(items); 
         alert('Failed to save new order. Please try again.');
         console.error('Error saving order:', error);
       } finally {
