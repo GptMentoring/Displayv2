@@ -201,7 +201,7 @@ const Slideshow: React.FC = () => {
               key={currentItem.id}
               src={currentItem.url}
               alt={`Slide ${currentIndex + 1}`}
-              className={`max-h-screen max-w-full object-contain ${getTransitionClass()}`}
+              className={`w-screen h-screen object-cover ${getTransitionClass()}`}
               style={{ opacity: isTransitioning ? 0 : 1, transition: transitionStyle }}
             />
           ) : (
