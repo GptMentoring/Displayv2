@@ -37,10 +37,6 @@ const UploadForm: React.FC<UploadFormProps> = ({ onContentAdded }) => {
         throw new Error('No valid iframe URL found in the code');
       }
       
-      if (!validateDataboxUrl(iframeSrc)) {
-        throw new Error('Only Databox iframe URLs are allowed');
-      }
-
       setPreviewUrl(iframeSrc);
       setIsPreviewOpen(true);
       setError(null);
@@ -79,15 +75,6 @@ const UploadForm: React.FC<UploadFormProps> = ({ onContentAdded }) => {
     }
     
     return src;
-  };
-
-  const validateDataboxUrl = (url: string): boolean => {
-    try {
-      const urlObj = new URL(url);
-      return urlObj.hostname === 'app.databox.com' || urlObj.hostname === 'databox.com';
-    } catch {
-      return false;
-    }
   };
 
   const uploadImage = async () => {
@@ -164,11 +151,6 @@ const UploadForm: React.FC<UploadFormProps> = ({ onContentAdded }) => {
         throw new Error('No valid iframe URL found in the code');
       }
       
-      // Validate Databox URL
-      if (!validateDataboxUrl(iframeSrc)) {
-        throw new Error('Only Databox iframe URLs are allowed');
-      }
-
       const { error } = await supabase
         .from('content_items')
         .insert({

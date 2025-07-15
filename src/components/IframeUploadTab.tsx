@@ -26,7 +26,7 @@ const IframeUploadTab: React.FC<IframeUploadTabProps> = ({
           className="w-full p-2 border border-gray-300 rounded-md h-32 font-mono text-sm focus:ring-indigo-500 focus:border-indigo-500"
         />
         <p className="mt-1 text-xs text-gray-500">
-          Only public Databox URLs/iframes are currently supported.
+          Paste any iframe code or direct URL here.
         </p>
         <div className="mt-2 flex gap-2">
           <button
