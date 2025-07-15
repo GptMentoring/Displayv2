@@ -41,7 +41,35 @@ const SlideshowSettings: React.FC<SlideshowSettingsProps> = () => {
         .eq('id', 'slideshow_settings')
         .single();
 
-      if (data && data.value) {
+      if (error && error.code === 'PGRST116') {
+        // No settings found, create default settings
+        const defaultSettings: CurrentSlideshowSettings = {
+          duration: 10,
+          transition: 'fade',
+          showControls: true,
+          layoutMode: 'regular',
+          imageFit: 'contain',
+        };
+
+        try {
+          const { error: upsertError } = await supabase
+            .from('settings')
+            .upsert({ 
+              id: 'slideshow_settings',
+              value: JSON.stringify(defaultSettings)
+            });
+
+          if (!upsertError) {
+            setDuration(defaultSettings.duration);
+            setTransition(defaultSettings.transition);
+            setShowControls(defaultSettings.showControls);
+            setLayoutMode(defaultSettings.layoutMode);
+            setImageFit(defaultSettings.imageFit);
+          }
+        } catch (e) {
+          console.error("Error creating default settings", e);
+        }
+      } else if (data && data.value) {
         try {
           const currentSettings = JSON.parse(data.value) as CurrentSlideshowSettings;
           setDuration(currentSettings.duration || 10);
@@ -51,10 +79,14 @@ const SlideshowSettings: React.FC<SlideshowSettingsProps> = () => {
           setImageFit(currentSettings.imageFit || 'contain');
         } catch (e) {
           console.error("Error parsing current settings", e);
-          // Fallback to defaults or initial props
+          // Fallback to defaults
           setDuration(10);
+          setTransition('fade');
+          setShowControls(true);
+          setLayoutMode('regular');
+          setImageFit('contain');
         }
-      } else if (error && error.code !== 'PGRST116') { // PGRST116: no rows found
+      } else if (error) {
         console.error("Error fetching current settings:", error.message);
       }
     };
