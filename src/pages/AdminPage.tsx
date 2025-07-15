@@ -5,7 +5,11 @@ import UploadForm from '../components/UploadForm';
 import ContentList from '../components/ContentList';
 import SlideshowSettings from '../components/SlideshowSettings';
 import { supabase } from '../lib/supabase';
+// No longer need Database or ContentItem here as they are handled by the hook
+// import { Database } from '../lib/database.types'; 
 import { useAdminData } from '../hooks/useAdminData'; // Import the hook
+
+// type ContentItem = Database['public']['Tables']['content_items']['Row']; // Handled by hook
 
 const AdminPage: React.FC = () => {
   const navigate = useNavigate();
@@ -18,6 +22,8 @@ const AdminPage: React.FC = () => {
     fetchContentItems // This is the refresh/refetch function from the hook
   } = useAdminData();
   
+  const [slideshowDuration, setSlideshowDuration] = useState(10); // Default 10 seconds
+
   useEffect(() => {
     const checkAuthAndFetchPageData = async () => {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -26,6 +32,9 @@ const AdminPage: React.FC = () => {
         navigate('/login');
         return;
       }
+      // Initial fetch of content items is managed by useAdminData's own useEffect.
+      // We only need to fetch page-specific settings here.
+      fetchSettings();
     };
 
     checkAuthAndFetchPageData();
@@ -43,6 +52,34 @@ const AdminPage: React.FC = () => {
       // Realtime subscription cleanup for content_items is handled by the hook.
     };
   }, [navigate]); 
+
+  const fetchSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('id', 'slideshow_duration') // Assuming 'slideshow_duration' is the ID for this setting
+        .single();
+
+      if (error && error.code !== 'PGRST116') { // PGRST116: no rows found
+        console.error('Error fetching slideshow_duration settings:', error);
+      }
+
+      if (data && data.value) {
+        const parsedDuration = parseInt(data.value, 10);
+        if (!isNaN(parsedDuration) && parsedDuration > 0) {
+          setSlideshowDuration(parsedDuration);
+        } else {
+          console.warn('Invalid slideshow duration value from settings:', data.value);
+        }
+      }
+    } catch (error) {
+      console.error('Exception while fetching settings:', error);
+    }
+  };
+
+  // fetchContentItems (for initial load/realtime) and handleReorderContent are now from useAdminData hook.
+  // The fetchContentItems returned by the hook can be used for manual refresh if needed.
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -94,7 +131,12 @@ const AdminPage: React.FC = () => {
           </div>
           
           <div>
-            <SlideshowSettings />
+            <SlideshowSettings initialDuration={slideshowDuration} /> 
+            {/* 
+              SlideshowSettings might need an onSave callback if it's supposed to update 
+              'slideshow_duration' in the database. This is outside the scope of useAdminData.
+              For now, it just receives the initialDuration.
+            */}
           </div>
         </div>
       </main>
