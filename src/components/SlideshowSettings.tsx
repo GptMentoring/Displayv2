@@ -3,34 +3,20 @@ import { Clock, Save, Captions as TransitionIcon, Eye, RefreshCw, AlertTriangle 
 import { supabase } from '../lib/supabase';
 import { useSettingsHistory, SettingsHistoryEntry } from '../hooks/useSettingsHistory'; // Import the hook and type
 
-// interface SettingsHistory { // This type is now SettingsHistoryEntry from the hook
-//   id: string;
-//   settings_id: string;
-//   value: string;
-//   created_at: string;
-// }
-
-interface SlideshowSettingsProps {
-  initialDuration: number; // This might become part of a larger settings object fetched initially
-}
+interface SlideshowSettingsProps {}
 
 type LayoutMode = 'regular' | 'quadrant';
-// Define a more comprehensive settings type, aligning with SUPABASE_LOGIC.md and useSlideshowData
+
 interface CurrentSlideshowSettings {
   duration: number;
   transition: 'fade' | 'slide' | 'zoom';
   showControls: boolean;
   layoutMode: LayoutMode;
   imageFit: 'contain' | 'cover';
-  // quadrantConfig would also be part of this if edited here, but for now, assuming it's separate or not in this form
 }
 
-
-const SlideshowSettings: React.FC<SlideshowSettingsProps> = ({ initialDuration }) => {
-  // Initialize state from a more comprehensive settings structure if available, or defaults
-  // For now, we'll keep individual states and synthesize them on save.
-  // Ideally, these would be part of a single settings object state.
-  const [duration, setDuration] = useState(initialDuration);
+const SlideshowSettings: React.FC<SlideshowSettingsProps> = () => {
+  const [duration, setDuration] = useState(10); // Default 10 seconds
   const [transition, setTransition] = useState<'fade' | 'slide' | 'zoom'>('fade');
   const [showControls, setShowControls] = useState(true);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>('regular');
@@ -47,9 +33,6 @@ const SlideshowSettings: React.FC<SlideshowSettingsProps> = ({ initialDuration }
     fetchHistory 
   } = useSettingsHistory('slideshow_settings', 5); // Use 'slideshow_settings' as the ID
 
-  // Fetch initial settings for the form (duration, transition etc.)
-  // This is a simplified example. A more robust solution would fetch the 'slideshow_settings' object
-  // and populate the form fields from it.
   useEffect(() => {
     const fetchCurrentSettings = async () => {
       const { data, error } = await supabase
@@ -61,7 +44,7 @@ const SlideshowSettings: React.FC<SlideshowSettingsProps> = ({ initialDuration }
       if (data && data.value) {
         try {
           const currentSettings = JSON.parse(data.value) as CurrentSlideshowSettings;
-          setDuration(currentSettings.duration || initialDuration);
+          setDuration(currentSettings.duration || 10);
           setTransition(currentSettings.transition || 'fade');
           setShowControls(currentSettings.showControls === undefined ? true : currentSettings.showControls);
           setLayoutMode(currentSettings.layoutMode || 'regular');
@@ -69,15 +52,14 @@ const SlideshowSettings: React.FC<SlideshowSettingsProps> = ({ initialDuration }
         } catch (e) {
           console.error("Error parsing current settings", e);
           // Fallback to defaults or initial props
-          setDuration(initialDuration);
+          setDuration(10);
         }
       } else if (error && error.code !== 'PGRST116') { // PGRST116: no rows found
         console.error("Error fetching current settings:", error.message);
       }
-      // If no settings found (PGRST116 or other non-critical error), form uses default/initial values
     };
     fetchCurrentSettings();
-  }, [initialDuration]);
+  }, []);
 
 
   const handleDurationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
