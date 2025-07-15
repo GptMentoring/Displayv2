@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Upload, Link2, X } from 'lucide-react'; // Removed PlayCircle as it's in IframeUploadTab
 import { supabase } from '../lib/supabase';
 import * as DOMPurify from 'isomorphic-dompurify';
-import ImageUploadTab, { contentCategories } from './ImageUploadTab'; // Import categories as well
+import ImageUploadTab from './ImageUploadTab';
 import IframeUploadTab from './IframeUploadTab';
 import IframePreviewModal from './IframePreviewModal'; 
 
@@ -14,10 +14,6 @@ const UploadForm: React.FC<UploadFormProps> = ({ onContentAdded }) => {
   const [activeTab, setActiveTab] = useState<'image' | 'iframe'>('image');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [iframeCode, setIframeCode] = useState('');
-  
-  // State for new fields
-  const [category, setCategory] = useState<string>(contentCategories[0].value); // Default to first category
-  const [tags, setTags] = useState<string>(''); // Comma-separated string
 
   const [isUploading, setIsUploading] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -26,15 +22,8 @@ const UploadForm: React.FC<UploadFormProps> = ({ onContentAdded }) => {
 
   // Reset category to default when tab changes
   useEffect(() => {
-    if (activeTab === 'iframe') {
-      setCategory('kpi'); // Default 'kpi' for iframes
-    } else {
-      setCategory(contentCategories[0].value); // Default to first category for images
-    }
-    setTags(''); // Reset tags when tab changes
     setError(null); // Clear errors
   }, [activeTab]);
-  // handleIframeCodeChange is effectively replaced by passing setIframeCode to IframeUploadTab
 
   const handlePreview = () => { // This function remains as it's called by IframeUploadTab
     if (!iframeCode) {
@@ -141,16 +130,12 @@ const UploadForm: React.FC<UploadFormProps> = ({ onContentAdded }) => {
       }
 
       // 3. Save to content_items table
-      const parsedTags = tags.split(',').map(tag => tag.trim()).filter(tag => tag);
-
       const { error: insertError } = await supabase
         .from('content_items')
         .insert({
           type: 'image',
           url: publicUrlData.publicUrl,
           storage_path: filePath,
-          category: category, // Add category
-          tags: parsedTags,   // Add parsed tags
         });
 
       if (insertError) {
@@ -159,8 +144,6 @@ const UploadForm: React.FC<UploadFormProps> = ({ onContentAdded }) => {
 
       // Success
       setImageFile(null);
-      setCategory(contentCategories[0].value); // Reset category
-      setTags(''); // Reset tags
       onContentAdded();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred while uploading');
@@ -192,8 +175,6 @@ const UploadForm: React.FC<UploadFormProps> = ({ onContentAdded }) => {
           type: 'iframe',
           url: iframeSrc,
           storage_path: null,
-          category: category, // Add category
-          tags: tags.split(',').map(tag => tag.trim()).filter(tag => tag), // Add parsed tags
         });
 
       if (error) {
@@ -202,8 +183,6 @@ const UploadForm: React.FC<UploadFormProps> = ({ onContentAdded }) => {
 
       // Success
       setIframeCode('');
-      setCategory('kpi'); // Reset category to KPI for iframe tab default
-      setTags(''); // Reset tags
       onContentAdded();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred while adding the iframe');
@@ -262,10 +241,6 @@ const UploadForm: React.FC<UploadFormProps> = ({ onContentAdded }) => {
               setImageFile(file);
               setError(null); 
             }}
-            category={category}
-            onCategoryChange={setCategory}
-            tags={tags}
-            onTagsChange={setTags}
           />
         ) : (
           <IframeUploadTab
@@ -275,10 +250,6 @@ const UploadForm: React.FC<UploadFormProps> = ({ onContentAdded }) => {
               setError(null); 
             }}
             onPreview={handlePreview}
-            category={category}
-            onCategoryChange={setCategory}
-            tags={tags}
-            onTagsChange={setTags}
           />
         )}
 
