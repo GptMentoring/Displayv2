@@ -19,7 +19,7 @@ const defaultSettings: Settings = {
   quadrantConfig: {
     topLeft: { type: 'image', contentId: null },
     topRight: { type: 'image', contentId: null },
-    bottomLeft: { type: 'iframe', contentId: null },
+    bottomLeft: { type: 'image', contentId: null },
     bottomRight: { type: 'iframe', contentId: null }
   }
 };
