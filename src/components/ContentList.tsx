@@ -142,18 +142,22 @@ const ContentList: React.FC<ContentListProps> = ({ items, onContentDeleted, onRe
 
     setIsDeleting(prev => ({ ...prev, [item.id]: true }));
     try {
+      // Delete from storage only if it's an image with storage_path
       if (item.type === 'image' && item.storage_path) {
         const { error: storageError } = await supabase.storage
           .from('content')
           .remove([item.storage_path]);
         if (storageError) console.error('Error deleting from storage:', storageError);
       }
+      // For iframes, we only need to delete from the database (no storage cleanup needed)
+      
+      // Delete from content_items table (works for both images and iframes)
       const { error } = await supabase.from('content_items').delete().eq('id', item.id);
       if (error) throw new Error(error.message);
       onContentDeleted();
     } catch (error) {
       console.error('Error deleting item:', error);
-      alert('Failed to delete item. Please try again.');
+      alert(`Failed to delete ${item.type}. Please try again.`);
     } finally {
       setIsDeleting(prev => ({ ...prev, [item.id]: false }));
     }
