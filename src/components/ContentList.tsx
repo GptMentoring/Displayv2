@@ -106,18 +106,18 @@ const SortableItem: React.FC<{ item: ContentItem; isDeleting: boolean; handleDel
               <span className="sr-only">Delete</span>
             </button>
           </div>
-          <div className="mt-2 truncate text-sm text-gray-500">
+          <div className="mt-2 text-sm text-gray-500">
             {item.type === 'iframe' ? (
               <a
                 href={item.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hover:underline text-blue-600"
+                className="hover:underline text-blue-600 break-all leading-relaxed"
               >
                 {item.url}
               </a>
             ) : (
-              <span className="truncate">{item.name || new URL(item.url).pathname.split('/').pop()}</span>
+              <span className="break-words">{item.name || new URL(item.url).pathname.split('/').pop()}</span>
             )}
           </div>
         </div>
